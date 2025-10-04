@@ -50,7 +50,7 @@ jobs:
             umask 077
 
             # .env 값을 가져옴.
-            aws secretsmanager get-secret-value \
+            sudo aws secretsmanager get-secret-value \
               --secret-id "${{ env.SECRET_ID }}" \
               --region "${{ env.AWS_REGION }}" \
               --query SecretString \
