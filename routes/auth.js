@@ -14,7 +14,7 @@ const User = require('../models/user'); // Import the User model
 
 /**
  * @swagger
- * /api/auth/register:
+ * /auth/register:
  *   post:
  *     summary: Register a new user
  *     tags: [Auth]
@@ -69,7 +69,7 @@ router.post('/register', async (req, res) => {
 
 /**
  * @swagger
- * /api/auth/login:
+ * /auth/login:
  *   post:
  *     summary: Login a user
  *     tags: [Auth]

@@ -14,7 +14,7 @@ const { authenticateToken } = require('../middleware/auth');
 
 /**
  * @swagger
- * /api/weather/summary:
+ * /weather/summary:
  *   get:
  *     summary: Get weather summary
  *     tags: [Weather]

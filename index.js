@@ -53,11 +53,11 @@ const requestLogger = (req, res, next) => {
 app.use(requestLogger);
 
 app.get('/', (req, res) => {
-  res.send('Hello, World from Node.js!');
+  res.redirect('/api-docs');
 });
 
-app.use('/api/auth', authRouter); // Add this line
-app.use('/api/weather', weatherRouter);
+app.use('/auth', authRouter); // Add this line
+app.use('/weather', weatherRouter);
 
 // Database synchronization
 const sequelize = require('./config/database');
