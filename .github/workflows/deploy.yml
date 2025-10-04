@@ -43,4 +43,4 @@ jobs:
             sudo docker stop today_weather_summary || true
             sudo docker rm today_weather_summary || true
             sudo docker pull ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
-            sudo docker run -d --name today_weather_summary -p 8000:8000 ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            sudo docker run -d --name ku-swt-container --network server-network ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
