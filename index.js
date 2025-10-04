@@ -34,7 +34,7 @@ const options = {
     ],
     servers: [
       { url: `http://localhost:${PORT}`, description: 'localhost'},
-      { url: `${process.env.API_SERVER_URL}:${PORT}`, description: 'ec2 server'},
+      { url: `${process.env.API_SERVER_URL}`, description: 'ec2 server'},
     ],
   },
   apis: ['./routes/*.js'], // files containing annotations as above
