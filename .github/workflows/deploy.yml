@@ -8,6 +8,8 @@ on:
 env:
   DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/ku-smartwalkingtour
   DOCKER_TAG: latest
+  SECRET_ID: ku-swt/env
+  AWS_REGION: ap-northeast-2
 
 jobs:
   build-and-push:
@@ -40,7 +42,28 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            sudo docker stop today_weather_summary || true
-            sudo docker rm today_weather_summary || true
+            APP_DIR=/home/ec2-user/app
+            CONTAINER_NAME=ku-swt-container
+            NETWORK_NAME=server-network
+
+            # 생성하는 파일의 권한은 반드시 600임을 보장.
+            umask 077
+
+            # .env 값을 가져옴.
+            aws secretsmanager get-secret-value \
+              --secret-id "${{ env.SECRET_ID }}" \
+              --region "${{ env.AWS_REGION }}" \
+              --query SecretString \
+              --output text > "${APP_DIR}/.env"
+
+            sudo docker stop "${CONTAINER_NAME}" || true
+            sudo docker rm "${CONTAINER_NAME}" || true
             sudo docker pull ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
-            sudo docker run -d --name ku-swt-container --network server-network ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            sudo docker run -d \
+              --name "${CONTAINER_NAME}" \
+              --network "${NETWORK_NAME}" \
+              -v "${APP_DIR}/.env:/usr/src/app/.env:ro" \ 
+              ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+            
+            # 저장했던 .env 파일을 삭제(rm보다 강력함)
+            sudo shred -u "${APP_DIR}/.env"
