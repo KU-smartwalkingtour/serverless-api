@@ -64,6 +64,3 @@ jobs:
               --network "${NETWORK_NAME}" \
               -v "${APP_DIR}/.env:/usr/src/app/.env:ro" \
               ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
-            
-            # 저장했던 .env 파일을 삭제(rm보다 강력함)
-            sudo shred -u "${APP_DIR}/.env"
