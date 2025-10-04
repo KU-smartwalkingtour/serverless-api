@@ -7,16 +7,16 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 
 const app = express();
-const PORT = 3000;
+const PORT = 8000;
 
 // Swagger definition
 const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Today Weather Summary API',
+      title: 'ku-smartwalkingtour',
       version: '1.0.0',
-      description: 'API for providing weather summaries with authentication',
+      description: 'API server for ku-smartwalkingtour',
     },
     components: { // Add this section for auth
       securitySchemes: {
