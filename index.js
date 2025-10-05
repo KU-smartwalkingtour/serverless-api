@@ -73,4 +73,7 @@ sequelize.authenticate()
   })
   .catch(err => {
     log('error', 'Unable to connect to the database:', err);
+    console.error('name:', err.name);
+    console.error('message:', err.message);
+    console.error('stack:', err.stack); 
   });

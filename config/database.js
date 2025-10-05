@@ -27,6 +27,12 @@ const sequelize = new Sequelize({
   database: process.env.DB_NAME,
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false   // "임시"로 인증서 검증 비활성화
+    },
+  },
   logging: console.log 
 });
 
