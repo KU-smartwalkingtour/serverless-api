@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { findClosestCourse, getCourseMetadataFromGpx, getCoordinatesFromGpx } = require('../utils/gpx-resolver');
+const { findClosestCourse, getCourseMetadataFromGpx, getCoordinatesFromGpx, findNClosestCourses } = require('../utils/gpx-resolver');
 const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
@@ -75,6 +75,79 @@ router.get('/find-closest', authenticateToken, async (req, res) => {
   } catch (error) {
     log('error', `Error finding closest course: ${error.message}`);
     res.status(500).json({ error: 'An error occurred while finding the closest course.' });
+  }
+});
+
+/**
+ * @swagger
+ * /course/find-n-closest:
+ *   get:
+ *     summary: Find the N closest walking courses
+ *     tags: [Course]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: lon
+ *         schema:
+ *           type: number
+ *         required: true
+ *         description: User's longitude.
+ *       - in: query
+ *         name: lat
+ *         schema:
+ *           type: number
+ *         required: true
+ *         description: User's latitude.
+ *       - in: query
+ *         name: n
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: Number of closest courses to find.
+ *     responses:
+ *       200:
+ *         description: Successful response with the N closest courses
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 closestCourses:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   description: The names of the N closest courses.
+ *       400:
+ *         description: Longitude(lon), Latitude(lat), and N are required query parameters.
+ *       401:
+ *         description: Unauthorized (token not provided)
+ *       403:
+ *         description: Forbidden (invalid token)
+ *       500:
+ *         description: An error occurred while finding the closest courses.
+ */
+router.get('/find-n-closest', authenticateToken, async (req, res) => {
+  try {
+    const { lon, lat, n } = req.query;
+
+    if (lon == null || lat == null || n == null) {
+      return res.status(400).json({ 
+        error: 'Longitude(lon), Latitude(lat), and N are required query parameters.' 
+      });
+    }
+
+    const closestCourses = await findNClosestCourses(parseFloat(lat), parseFloat(lon), parseInt(n));
+    
+    if (closestCourses) {
+      res.json({ closestCourses });
+    } else {
+      res.status(404).json({ error: 'No courses found or unable to determine the closest courses.' });
+    }
+
+  } catch (error) {
+    log('error', `Error finding closest courses: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred while finding the closest courses.' });
   }
 });
 
