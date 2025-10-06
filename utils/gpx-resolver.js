@@ -171,4 +171,36 @@ async function findClosestCourse(lat, lon) {
     return closestCourse;
 }
 
-module.exports = { getCoordinatesFromGpx, getCourseMetadataFromGpx, findClosestCourse };
+async function findNClosestCourses(lat, lon, n) {
+    const gpxDir = path.join(__dirname, 'gpx_files');
+    const files = await fs.promises.readdir(gpxDir);
+    const parser = new xml2js.Parser({ explicitArray: false });
+
+    let courses = [];
+
+    for (const file of files) {
+        if (path.extname(file) === '.gpx') {
+            const filePath = path.join(gpxDir, file);
+            const data = await fs.promises.readFile(filePath, 'utf8');
+            const result = await parser.parseStringPromise(data);
+            
+            const extensions = result.gpx.trk.extensions;
+            const fileLon = parseFloat(extensions['ogr:COORD_X']);
+            const fileLat = parseFloat(extensions['ogr:COORD_Y']);
+
+            if (!isNaN(fileLat) && !isNaN(fileLon)) {
+                const distance = getDistance(lat, lon, fileLat, fileLon);
+                const courseNameMatch = file.match(/서울둘레길2\.0_(\d+)코스/);
+                if (courseNameMatch) {
+                    courses.push({ course: courseNameMatch[1], distance: distance });
+                }
+            }
+        }
+    }
+
+    courses.sort((a, b) => a.distance - b.distance);
+
+    return courses.slice(0, n).map(c => c.course);
+}
+
+module.exports = { getCoordinatesFromGpx, getCourseMetadataFromGpx, findClosestCourse, findNClosestCourses };
