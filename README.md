@@ -1,4 +1,4 @@
-# 초단기예보 제공 API 서버 (기상청 API 초단기 예보 활용)
+# ku-smartwalkingtour
 
 ## 사전 준비
 
