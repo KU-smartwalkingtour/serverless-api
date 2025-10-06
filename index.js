@@ -1,6 +1,7 @@
 const express = require('express');
 require('dotenv').config();
 const weatherRouter = require('./routes/weather');
+const courseRouter = require('./routes/course');
 const authRouter = require('./routes/auth'); // Add this line
 const { log } = require('./utils/logger');
 const swaggerUi = require('swagger-ui-express');
@@ -58,6 +59,7 @@ app.get('/', (req, res) => {
 
 app.use('/auth', authRouter); // Add this line
 app.use('/weather', weatherRouter);
+app.use('/course', courseRouter);
 
 // Database synchronization
 const sequelize = require('./config/database');
