@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - feat/get_data_from_s3
 
 env:
   DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/ku-smartwalkingtour
