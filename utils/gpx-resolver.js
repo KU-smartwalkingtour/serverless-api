@@ -5,7 +5,7 @@ const { get } = require('http');
 
 const s3Client = new S3Client({ region: 'ap-northeast-2' }); // VPC 엔드포인트를 통해 통신하므로 별도 인증 정보 설정이 필요 없습니다.
 const BUCKET_NAME = 'ku-smartwalkingtour-seoultrail-gpxstorage-bucket';
-const GPX_PREFIX = 'gpx-files/';
+const GPX_PREFIX = 'gpx_files/';
 
 // S3 GetObjectCommand의 Body(Stream)를 문자열로 변환하는 헬퍼 함수
 const streamToString = (stream) =>
