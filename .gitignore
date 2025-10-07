@@ -1,6 +1,9 @@
 # Dependencies
 /node_modules
 
+# gpx file directory
+gpx_files
+
 # Environment variables
 .env
 

@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { findClosestCourse, getCourseMetadataFromGpx, getCoordinatesFromGpx, findNClosestCourses } = require('../utils/gpx-resolver');
-const fs = require('fs');
-const path = require('path');
+const {
+    findClosestCourse,
+    getCourseMetadataFromGpx,
+    getCoordinatesFromGpx,
+    findNClosestCourses,
+    getGpxContentFromS3
+} = require('../utils/gpx-resolver');
 const { log } = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -194,14 +198,12 @@ router.get('/metadata', authenticateToken, async (req, res) => {
       });
     }
 
-    const fileName = `서울둘레길2.0_${courseNumber}코스.gpx`;
-    const filePath = path.join(__dirname, '../utils/gpx_files', fileName);
+    const gpxContent = await getGpxContentFromS3(courseNumber);
 
-    if (!fs.existsSync(filePath)) {
+    if (!gpxContent) {
         return res.status(404).json({ error: 'Course file not found.' });
     }
 
-    const gpxContent = await fs.promises.readFile(filePath, 'utf8');
     const metadata = await getCourseMetadataFromGpx(gpxContent);
     
     res.json(metadata);
@@ -262,14 +264,12 @@ router.get('/coordinates', authenticateToken, async (req, res) => {
       });
     }
 
-    const fileName = `서울둘레길2.0_${courseNumber}코스.gpx`;
-    const filePath = path.join(__dirname, '../utils/gpx_files', fileName);
+    const gpxContent = await getGpxContentFromS3(courseNumber);
 
-    if (!fs.existsSync(filePath)) {
+    if (!gpxContent) {
         return res.status(404).json({ error: 'Course file not found.' });
     }
 
-    const gpxContent = await fs.promises.readFile(filePath, 'utf8');
     const coordinates = await getCoordinatesFromGpx(gpxContent);
     
     res.json(coordinates);
