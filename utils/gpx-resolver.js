@@ -3,9 +3,9 @@ const gpxParse = require('gpx-parse');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { get } = require('http');
 
-const s3Client = new S3Client({}); // VPC 엔드포인트를 통해 통신하므로 별도 인증 정보 설정이 필요 없습니다.
+const s3Client = new S3Client({ region: 'ap-northeast-2' }); // VPC 엔드포인트를 통해 통신하므로 별도 인증 정보 설정이 필요 없습니다.
 const BUCKET_NAME = 'ku-smartwalkingtour-seoultrail-gpxstorage-bucket';
-const GPX_PREFIX = 'gpx-files/';
+const GPX_PREFIX = 'gpx_files/';
 
 // S3 GetObjectCommand의 Body(Stream)를 문자열로 변환하는 헬퍼 함수
 const streamToString = (stream) =>
@@ -179,7 +179,8 @@ async function getCourseDistances(lat, lon) {
 
             if (!isNaN(fileLat) && !isNaN(fileLon)) {
                 const distance = getDistance(lat, lon, fileLat, fileLon);
-                const courseNameMatch = file.Key.match(/서울둘레길2\.0_(\d+)코스\.gpx/);
+                nfc = file.Key.normalize("NFC")
+                const courseNameMatch = nfc.match(/서울둘레길2\.0_(\d+)코스\.gpx/);
                 if (courseNameMatch) {
                     return { course: courseNameMatch[1], distance: distance };
                 }
@@ -215,7 +216,8 @@ async function findNClosestCourses(lat, lon, n) {
 }
 
 async function getGpxContentFromS3(courseNumber) {
-    const fileName = `서울둘레길2.0_${courseNumber}코스.gpx`;
+    var fileName = `서울둘레길2.0_${courseNumber}코스.gpx`;
+    fileName = fileName.normalize('NFD');
     const key = `${GPX_PREFIX}${fileName}`;
 
     try {
