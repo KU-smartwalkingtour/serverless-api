@@ -3,7 +3,7 @@ const gpxParse = require('gpx-parse');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { get } = require('http');
 
-const s3Client = new S3Client({}); // VPC 엔드포인트를 통해 통신하므로 별도 인증 정보 설정이 필요 없습니다.
+const s3Client = new S3Client({ region: 'ap-northeast-2' }); // VPC 엔드포인트를 통해 통신하므로 별도 인증 정보 설정이 필요 없습니다.
 const BUCKET_NAME = 'ku-smartwalkingtour-seoultrail-gpxstorage-bucket';
 const GPX_PREFIX = 'gpx-files/';
 
