@@ -179,7 +179,8 @@ async function getCourseDistances(lat, lon) {
 
             if (!isNaN(fileLat) && !isNaN(fileLon)) {
                 const distance = getDistance(lat, lon, fileLat, fileLon);
-                const courseNameMatch = file.Key.match(/서울둘레길2\.0_(\d+)코스\.gpx/);
+                nfc = file.Key.normalize("NFC")
+                const courseNameMatch = nfc.match(/서울둘레길2\.0_(\d+)코스\.gpx/);
                 if (courseNameMatch) {
                     return { course: courseNameMatch[1], distance: distance };
                 }
