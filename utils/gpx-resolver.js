@@ -1,9 +1,20 @@
 const xml2js = require('xml2js');
 const gpxParse = require('gpx-parse');
-const path = require('path');
-const fs = require('fs');
+const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { get } = require('http');
 
+const s3Client = new S3Client({}); // VPC 엔드포인트를 통해 통신하므로 별도 인증 정보 설정이 필요 없습니다.
+const BUCKET_NAME = 'ku-smartwalkingtour-seoultrail-gpxstorage-bucket';
+const GPX_PREFIX = 'gpx-files/';
+
+// S3 GetObjectCommand의 Body(Stream)를 문자열로 변환하는 헬퍼 함수
+const streamToString = (stream) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on("data", (chunk) => chunks.push(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+  });
 
 /**
  * GPX 파일 콘텐츠를 파싱하여 위도, 경도 좌표 배열을 반환합니다.
@@ -136,18 +147,30 @@ function getDistance(lat1, lon1, lat2, lon2) {
     return distance;
 }
 
-async function findClosestCourse(lat, lon) {
-    const gpxDir = path.join(__dirname, 'gpx_files');
-    const files = await fs.promises.readdir(gpxDir);
+async function getCourseDistances(lat, lon) {
     const parser = new xml2js.Parser({ explicitArray: false });
 
-    let closestCourse = null;
-    let minDistance = Infinity;
+    const listCommand = new ListObjectsV2Command({
+        Bucket: BUCKET_NAME,
+        Prefix: GPX_PREFIX,
+    });
 
-    for (const file of files) {
-        if (path.extname(file) === '.gpx') {
-            const filePath = path.join(gpxDir, file);
-            const data = await fs.promises.readFile(filePath, 'utf8');
+    const listedObjects = await s3Client.send(listCommand);
+    if (!listedObjects.Contents) {
+        return [];
+    }
+
+    const gpxFiles = listedObjects.Contents.filter(obj => obj.Key.endsWith('.gpx'));
+
+    const coursePromises = gpxFiles.map(async (file) => {
+        try {
+            const getCommand = new GetObjectCommand({
+                Bucket: BUCKET_NAME,
+                Key: file.Key,
+            });
+            const s3Object = await s3Client.send(getCommand);
+            const data = await streamToString(s3Object.Body);
+
             const result = await parser.parseStringPromise(data);
             
             const extensions = result.gpx.trk.extensions;
@@ -156,51 +179,58 @@ async function findClosestCourse(lat, lon) {
 
             if (!isNaN(fileLat) && !isNaN(fileLon)) {
                 const distance = getDistance(lat, lon, fileLat, fileLon);
-
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    const courseNameMatch = file.match(/서울둘레길2\.0_(\d+)코스/);
-                    if (courseNameMatch) {
-                        closestCourse = courseNameMatch[1];
-                    }
+                const courseNameMatch = file.Key.match(/서울둘레길2\.0_(\d+)코스\.gpx/);
+                if (courseNameMatch) {
+                    return { course: courseNameMatch[1], distance: distance };
                 }
             }
+        } catch (error) {
+            console.error(`Error processing file ${file.Key}:`, error);
         }
+        return null;
+    });
+    
+    const courses = (await Promise.all(coursePromises)).filter(Boolean);
+    return courses;
+}
+
+async function findClosestCourse(lat, lon) {
+    const courses = await getCourseDistances(lat, lon);
+    
+    if (!courses || courses.length === 0) {
+        return null;
     }
 
-    return closestCourse;
+    const closestCourse = courses.reduce((min, course) => course.distance < min.distance ? course : min, courses[0]);
+    
+    return closestCourse.course;
 }
 
 async function findNClosestCourses(lat, lon, n) {
-    const gpxDir = path.join(__dirname, 'gpx_files');
-    const files = await fs.promises.readdir(gpxDir);
-    const parser = new xml2js.Parser({ explicitArray: false });
-
-    let courses = [];
-
-    for (const file of files) {
-        if (path.extname(file) === '.gpx') {
-            const filePath = path.join(gpxDir, file);
-            const data = await fs.promises.readFile(filePath, 'utf8');
-            const result = await parser.parseStringPromise(data);
-            
-            const extensions = result.gpx.trk.extensions;
-            const fileLon = parseFloat(extensions['ogr:COORD_X']);
-            const fileLat = parseFloat(extensions['ogr:COORD_Y']);
-
-            if (!isNaN(fileLat) && !isNaN(fileLon)) {
-                const distance = getDistance(lat, lon, fileLat, fileLon);
-                const courseNameMatch = file.match(/서울둘레길2\.0_(\d+)코스/);
-                if (courseNameMatch) {
-                    courses.push({ course: courseNameMatch[1], distance: distance });
-                }
-            }
-        }
-    }
-
+    const courses = await getCourseDistances(lat, lon);
+    
     courses.sort((a, b) => a.distance - b.distance);
 
     return courses.slice(0, n).map(c => c.course);
 }
 
-module.exports = { getCoordinatesFromGpx, getCourseMetadataFromGpx, findClosestCourse, findNClosestCourses };
+async function getGpxContentFromS3(courseNumber) {
+    const fileName = `서울둘레길2.0_${courseNumber}코스.gpx`;
+    const key = `${GPX_PREFIX}${fileName}`;
+
+    try {
+        const command = new GetObjectCommand({
+            Bucket: BUCKET_NAME,
+            Key: key,
+        });
+        const response = await s3Client.send(command);
+        return await streamToString(response.Body);
+    } catch (error) {
+        if (error.name === 'NoSuchKey') {
+            return null; // 파일이 없으면 null 반환
+        }
+        throw error; // 그 외 다른 에러는 다시 던짐
+    }
+}
+
+module.exports = { getCoordinatesFromGpx, getCourseMetadataFromGpx, findClosestCourse, findNClosestCourses, getGpxContentFromS3 };
