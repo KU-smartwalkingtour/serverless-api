@@ -215,7 +215,8 @@ async function findNClosestCourses(lat, lon, n) {
 }
 
 async function getGpxContentFromS3(courseNumber) {
-    const fileName = `서울둘레길2.0_${courseNumber}코스.gpx`;
+    var fileName = `서울둘레길2.0_${courseNumber}코스.gpx`;
+    fileName = fileName.normalize('NFD');
     const key = `${GPX_PREFIX}${fileName}`;
 
     try {
