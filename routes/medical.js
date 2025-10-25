@@ -46,14 +46,22 @@ const { authenticateToken } = require('../middleware/auth');
  */
 
 
-router.get('/nearby', authenticateToken, async (req, res) => {
+router.get('/nearby', /* authenticateToken, */ async (req, res) => {
     try {
-        const { lon, lat } = req.query;
+        let { lon, lat } = req.query; 
 
         if (!lon || !lat) {
             return res.status(400).json({ 
                 error: 'Latitude(lat) and Longitude(lon) are required query parameters.' 
             });
+        }
+        const isLatSwapped = parseFloat(lat) > 90 && parseFloat(lon) < 90;
+
+        if (isLatSwapped) {
+            // 값이 뒤바뀌었으면 임시 변수를 이용해 교정합니다.
+            const temp = lat;
+            lat = lon;
+            lon = temp;
         }
 
         const medicalFacilities = await fetchNearbyFacilities(lat, lon);
