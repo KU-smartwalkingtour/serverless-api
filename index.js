@@ -1,8 +1,12 @@
 const express = require('express');
 require('dotenv').config();
+const cookieParser = require('cookie-parser'); // Add this line
+
 const weatherRouter = require('./routes/weather');
 const courseRouter = require('./routes/course');
-const authRouter = require('./routes/auth'); // Add this line
+const authRouter = require('./routes/auth');
+const userRouter = require('./routes/user'); // Add this line
+
 const { log } = require('./utils/logger');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
@@ -19,7 +23,7 @@ const options = {
       version: '1.0.0',
       description: 'API server for ku-smartwalkingtour',
     },
-    components: { // Add this section for auth
+    components: { 
       securitySchemes: {
         bearerAuth: {
           type: 'http',
@@ -28,7 +32,7 @@ const options = {
         },
       },
     },
-    security: [ // Add this section to apply auth globally
+    security: [ 
       {
         bearerAuth: [],
       },
@@ -44,7 +48,8 @@ const options = {
 const swaggerSpec = swaggerJsdoc(options);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-app.use(express.json()); // Add this line to parse JSON bodies
+app.use(express.json());
+app.use(cookieParser()); // Add this line
 
 const requestLogger = (req, res, next) => {
   log('info', `Request: ${req.method} ${req.url} ${JSON.stringify(req.query)}`);
@@ -57,16 +62,35 @@ app.get('/', (req, res) => {
   res.redirect('/api-docs');
 });
 
-app.use('/auth', authRouter); // Add this line
+// Register routes
+app.use('/auth', authRouter);
 app.use('/weather', weatherRouter);
 app.use('/course', courseRouter);
+app.use('/user', userRouter); // Add this line
 
-// Database synchronization
+// --- Database Synchronization ---
+
+// Ensure all models are loaded before syncing
+require('./models/user');
+require('./models/authRefreshToken');
+require('./models/passwordResetRequest');
+require('./models/userSavedCourse');
+require('./models/userCourseHistory');
+require('./models/userLocation');
+require('./models/userStat');
+
 const sequelize = require('./config/database');
+// Use { alter: true } in development to avoid dropping data, but be cautious.
+// In production, you should use migrations.
+const syncOptions = {
+    // alter: process.env.NODE_ENV === 'development' 
+};
+
 sequelize.authenticate()
   .then(() => {
     log('info', 'Database connection has been established successfully.');
-    return sequelize.sync(); // Sync all models
+    // Sync all models
+    return sequelize.sync(syncOptions); 
   })
   .then(() => {
     app.listen(PORT, () => {

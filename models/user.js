@@ -2,22 +2,43 @@ const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
 const User = sequelize.define('User', {
-  username: {
-    type: DataTypes.STRING,
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true,
+  },
+  email: {
+    type: DataTypes.TEXT,
     allowNull: false,
-    unique: true
+    unique: true,
   },
-  password: {
-    type: DataTypes.STRING,
-    allowNull: false
+  password_hash: {
+    type: DataTypes.TEXT,
   },
-  status: {
-    type: DataTypes.ENUM('active', 'withdrawn'), // 'active':활성상태 또는 'withdrawn':탈퇴상태 값만 허용
-    allowNull: false,                           
-    defaultValue: 'active'                     
-  }
+  nickname: {
+    type: DataTypes.STRING(50),
+  },
+  language: {
+    type: DataTypes.STRING(10),
+    defaultValue: 'ko',
+  },
+  distance_unit: {
+    type: DataTypes.ENUM('km', 'mi'),
+    allowNull: false,
+    defaultValue: 'km',
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  },
 }, {
   timestamps: true,
+  paranoid: true, // for soft deletes
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: 'deleted_at',
+  tableName: 'users',
 });
 
 module.exports = User;
