@@ -2,9 +2,7 @@
 
 const express = require('express');
 const router = express.Router();
-// 💡 utils/medical.js 파일에서 로직을 가져옵니다.
 const { fetchNearbyFacilities } = require('../utils/medical'); 
-// MedicalError가 있다면 사용, 없다면 다른 에러 클래스를 가정합니다.
 const MedicalError = require('../utils/error'); 
 const { log } = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
@@ -58,7 +56,6 @@ router.get('/nearby', authenticateToken, async (req, res) => {
             });
         }
 
-        // 💡 utils/medical의 통신 함수를 호출합니다.
         const medicalFacilities = await fetchNearbyFacilities(lat, lon);
         
         res.json(medicalFacilities);
