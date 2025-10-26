@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { getCourseCoordinates } = require('@utils/course-gpx');
-const { findClosestCourse, findNClosestCourses } = require('@utils/closest-course');
-const { getCourseMetadata } = require('@utils/course-metadata');
-const { getRandomCourses } = require('@utils/random-course');
+const { getCourseCoordinates } = require('@utils/course/course-gpx');
+const { findClosestCourse, findNClosestCourses } = require('@utils/course/closest-course');
+const { getCourseMetadata } = require('@utils/course/course-metadata');
+const { getRandomCourses } = require('@utils/course/random-course');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
 
