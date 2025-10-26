@@ -1,61 +1,74 @@
-// utils/medical.js
-
 const axios = require('axios');
-const xml2js = require('xml2js'); // npm install xml2js 필요
+const xml2js = require('xml2js');
+const { logger } = require('@utils/logger');
+
+// XML 파서 인스턴스 (재사용 가능)
 const parser = new xml2js.Parser({ explicitArray: false });
 
-// .env 파일에서 키와 엔드포인트를 불러옵니다.
+// API 설정
 const ENDPOINT = process.env.NMC_HOSPITAL_ENDPOINT;
 const API_KEY = process.env.NMC_HOSPITAL_KEY;
+const DEFAULT_NUM_ROWS = 10;
 
 /**
+ * 필수 환경 변수 검증
+ * @throws {Error} 필수 환경 변수가 누락된 경우
+ */
+const validateEnvironment = () => {
+  if (!ENDPOINT || !API_KEY) {
+    throw new Error('NMC_HOSPITAL_ENDPOINT and NMC_HOSPITAL_KEY must be configured');
+  }
+};
+
+/**
+ * 주변 의료 시설 (병원 및 약국) 조회
  * @param {string} lat - 위도 (WGS84_Y)
  * @param {string} lon - 경도 (WGS84_X)
- * @returns {Array} 병원/약국 데이터 목록 (JSON)
+ * @param {number} [numOfRows=10] - 반환할 결과 수
+ * @returns {Promise<Array>} 의료 시설 데이터 배열 (JSON)
+ * @throws {Error} API 호출 실패 또는 응답 파싱 실패 시
  */
-exports.fetchNearbyFacilities = async (lat, lon) => {
-    // 1. API 호출 URL 구성 (API 문서를 참고하여 파라미터 WGS84_Y/X에 lat/lon을 할당)
-    const encodedKey = encodeURIComponent(API_KEY);
-    const apiUrl = `${ENDPOINT}?serviceKey=${API_KEY}&WGS84_Y=${lat}&WGS84_X=${lon}&numOfRows=10`;
+const fetchNearbyFacilities = async (lat, lon, numOfRows = DEFAULT_NUM_ROWS) => {
+  try {
+    validateEnvironment();
 
     const params = {
-        serviceKey: API_KEY, // axios가 이 값을 자동으로 URL 인코딩
-        WGS84_Y: lat,
-        WGS84_X: lon,
-        numOfRows: 10
+      serviceKey: API_KEY,
+      WGS84_Y: lat,
+      WGS84_X: lon,
+      numOfRows,
     };
-    try {
-        const response = await axios.get(ENDPOINT, { params: params });
-        // 2. 외부 API 호출 (axios)
-        const xmlData = response.data;
 
-        // 3. XML 데이터를 JSON으로 파싱 (Promise로 래핑)
-        return new Promise((resolve, reject) => {
-            parser.parseString(xmlData, (err, result) => {
-                if (err) {
-                    return reject(new Error("Failed to parse external API response (XML)."));
-                }
-                
-                // 파싱된 결과에서 실제 데이터 목록을 추출
-                const items = result.response?.body?.items?.item;
+    logger.debug(`주변 시설 조회 중 - 좌표: ${lat}, ${lon}`);
+    const response = await axios.get(ENDPOINT, { params });
+    const xmlData = response.data;
 
-                // 데이터가 유효하면 배열 형태로 반환, 없으면 빈 배열 반환
-                if (!items) {
-                    resolve([]);
-                } else {
-                    resolve(Array.isArray(items) ? items : [items]);
-                }
-            });
-        });
+    // async/await를 사용하여 XML 데이터를 JSON으로 파싱
+    const result = await parser.parseStringPromise(xmlData);
 
-    } catch (error) {
-        if (error.response) {
-            console.error('NMC API 상세 오류 정보:');
-            console.error('Status Code:', error.response.status); // 500이 찍힐 것
-            console.error('Response Data:', error.response.data); // 외부 API가 보낸 RAW 데이터 (XML/HTML)
-        } else {
-            console.error('NMC API 네트워크 오류:', error.message);
-        }
-        throw new Error("External medical API call failed.");
+    // 파싱된 결과에서 항목 추출
+    const items = result.response?.body?.items?.item;
+
+    // 배열 반환 (단일 항목과 다중 항목 모두 처리)
+    if (!items) {
+      logger.debug('주변 의료시설을 찾을 수 없음');
+      return [];
     }
+
+    return Array.isArray(items) ? items : [items];
+  } catch (error) {
+    if (error.response) {
+      logger.error('NMC API 오류', {
+        statusCode: error.response.status,
+        data: error.response.data,
+      });
+    } else if (error.message.includes('parseStringPromise')) {
+      logger.error('의료 API XML 응답 파싱 실패');
+    } else {
+      logger.error(`의료 API 네트워크 오류: ${error.message}`);
+    }
+    throw new Error('주변 의료시설 조회 실패');
+  }
 };
+
+module.exports = { fetchNearbyFacilities };

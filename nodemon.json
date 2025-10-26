@@ -1,0 +1,23 @@
+{
+  "watch": ["index.js", "app.js", "routes/", "models/", "utils/", "middleware/", "config/"],
+  "ignore": [
+    "node_modules/",
+    ".git/",
+    "*.test.js",
+    "*.spec.js",
+    "coverage/",
+    "*.log",
+    ".env.example",
+    "README.md",
+    "*.md"
+  ],
+  "ext": "js,json",
+  "exec": "node index.js",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000,
+  "verbose": true,
+  "restartable": "rs",
+  "colours": true
+}

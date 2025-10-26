@@ -1,0 +1,100 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const { logger } = require('@utils/logger');
+const { User, AuthRefreshToken } = require('@models');
+const { generateTokens } = require('@utils/auth');
+const { validate, loginSchema } = require('@utils/validation');
+
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: 사용자 로그인
+ *     description: 이메일과 비밀번호로 로그인하고 액세스 토큰을 발급받습니다.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: 사용자 이메일
+ *                 example: user@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: 비밀번호
+ *                 example: password123
+ *     responses:
+ *       200:
+ *         description: 로그인 성공. 토큰과 사용자 정보가 반환됩니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                   description: JWT 액세스 토큰
+ *                 refreshToken:
+ *                   type: string
+ *                   description: 리프레시 토큰
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string, format: uuid, description: 사용자 ID }
+ *                     email: { type: string, format: email, description: 이메일 }
+ *                     nickname: { type: string, description: 닉네임 }
+ *       400:
+ *         description: 입력값이 유효하지 않음
+ *       401:
+ *         description: 이메일 또는 비밀번호가 일치하지 않음
+ *       500:
+ *         description: 서버 오류
+ */
+router.post('/', validate(loginSchema), async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // 활성화된 사용자 조회
+    const user = await User.findOne({ where: { email, is_active: true } });
+    if (!user) {
+      return res.status(401).json({ error: '이메일 또는 비밀번호가 일치하지 않습니다.' });
+    }
+
+    // 비밀번호 검증
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: '이메일 또는 비밀번호가 일치하지 않습니다.' });
+    }
+
+    // 기존 리프레시 토큰 무효화
+    await AuthRefreshToken.update(
+      { revoked_at: new Date() },
+      {
+        where: { user_id: user.id, revoked_at: null },
+      }
+    );
+
+    // 새 토큰 발급
+    const { accessToken, refreshToken } = await generateTokens(user);
+
+    logger.info(`사용자 로그인: ${email}`);
+    res.json({
+      accessToken,
+      refreshToken,
+      user: { id: user.id, email: user.email, nickname: user.nickname },
+    });
+  } catch (error) {
+    logger.error(`로그인 중 오류 발생: ${error.message}`);
+    res.status(500).json({ error: '로그인 처리 중 오류가 발생했습니다.' });
+  }
+});
+
+module.exports = router;

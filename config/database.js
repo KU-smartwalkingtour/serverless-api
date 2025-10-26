@@ -1,4 +1,5 @@
 const { Sequelize } = require('sequelize');
+const { logger } = require('@utils/logger');
 require('dotenv').config(); // 환경 변수를 사용하기 위해 dotenv 추가
 
 /*
@@ -17,8 +18,6 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 });
 */
 
-
-
 // 로컬 개발 환경에서 사용할 경우 아래 설정 사용
 const sequelize = new Sequelize({
   dialect: 'postgres',
@@ -30,12 +29,11 @@ const sequelize = new Sequelize({
   dialectOptions: {
     ssl: {
       require: true,
-      rejectUnauthorized: false   // "임시"로 인증서 검증 비활성화
+      rejectUnauthorized: false, // "임시"로 인증서 검증 비활성화
     },
   },
-  logging: console.log 
+  logging: (msg) => logger.debug(msg), // Pino logger를 사용한 SQL 쿼리 로깅
+  // 프로덕션에서는 false로 설정: logging: process.env.NODE_ENV === 'production' ? false : (msg) => logger.debug(msg),
 });
-
-
 
 module.exports = sequelize;

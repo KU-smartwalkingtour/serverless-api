@@ -1,32 +1,32 @@
 const jwt = require('jsonwebtoken');
-const { log } = require('../utils/logger');
-const User = require('../models/user');
+const { logger } = require('@utils/logger');
+const { User } = require('@models');
 
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (token == null) {
-    return res.sendStatus(401); // Unauthorized
+    return res.sendStatus(401); // 인증되지 않음
   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Fetch the user from the database using the ID from the token
+
+    // 토큰의 ID로 데이터베이스에서 사용자 조회
     const user = await User.findOne({ where: { id: decoded.id, is_active: true } });
 
     if (!user) {
-      log('warn', `Authentication failed: User not found or inactive for ID: ${decoded.id}`);
-      return res.sendStatus(403); // Forbidden
+      logger.warn(`인증 실패: 사용자를 찾을 수 없거나 비활성 상태 - ID: ${decoded.id}`);
+      return res.sendStatus(403); // 접근 거부
     }
 
-    // Attach the Sequelize user object to the request
+    // Sequelize 사용자 객체를 요청에 첨부
     req.user = user;
     next();
   } catch (err) {
-    log('error', `JWT verification error: ${err.message}`);
-    return res.sendStatus(403); // Forbidden
+    logger.error(`JWT 검증 오류: ${err.message}`);
+    return res.sendStatus(403); // 접근 거부
   }
 };
 
