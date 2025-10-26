@@ -21,10 +21,6 @@ LABEL maintainer="cloudwebservice-team10" \
       description="Cloud Web Service API Server" \
       version="1.0.0"
 
-# Create non-root user for security
-RUN addgroup -g 1000 node && \
-    adduser -u 1000 -G node -s /bin/sh -D node
-
 # Set working directory
 WORKDIR /usr/src/app
 
