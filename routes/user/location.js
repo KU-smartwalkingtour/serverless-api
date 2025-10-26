@@ -7,8 +7,8 @@ const { validate, updateLocationSchema } = require('@utils/validation');
 
 /**
  * @swagger
- * /user/location:
- *   post:
+ * /user/coordinates:
+ *   put:
  *     summary: 사용자의 마지막 위치 업데이트
  *     description: 인증된 사용자의 현재 위치 정보(위도, 경도)를 업데이트합니다.
  *     tags: [User]
@@ -32,7 +32,7 @@ const { validate, updateLocationSchema } = require('@utils/validation');
  *                 description: 경도 (-180 ~ 180)
  *                 example: 126.9780
  *     responses:
- *       200:
+ *       '200':
  *         description: 위치가 성공적으로 업데이트되었습니다.
  *         content:
  *           application/json:
@@ -42,14 +42,14 @@ const { validate, updateLocationSchema } = require('@utils/validation');
  *                 message:
  *                   type: string
  *                   description: 성공 메시지
- *       400:
+ *       '400':
  *         description: 입력값이 유효하지 않음
- *       401:
+ *       '401':
  *         description: 인증되지 않음
- *       500:
+ *       '500':
  *         description: 서버 오류
  */
-router.post('/', authenticateToken, validate(updateLocationSchema), async (req, res) => {
+router.put('/', authenticateToken, validate(updateLocationSchema), async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
 
