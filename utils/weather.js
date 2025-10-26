@@ -79,7 +79,7 @@ const getNxNy = async (lon, lat) => {
       if (parts.length >= 4) {
         const nx = parseInt(parts[2], 10);
         const ny = parseInt(parts[3], 10);
-        logger.debug(`좌표를 격자로 변환 완료: nx=${nx}, ny=${ny}`);
+        logger.debug(`좌표를 격자로 변환 완료: nx=${nx}, ny=${ny}`);  
         return { nx, ny };
       }
     }
@@ -106,7 +106,7 @@ const convertWGS84toTM = (lon, lat) => {
 
     // Convert coordinates
     const [tmX, tmY] = proj4(wgs84, 'EPSG:5186', [lon, lat]);
-    log('debug', `Converted coords WGS84(${lon}, ${lat}) to TM(${tmX}, ${tmY})`);
+    logger.debug(`Converted coords WGS84(${lon}, ${lat}) to TM(${tmX}, ${tmY})`);
     return { x: tmX, y: tmY };
 };
 
@@ -144,10 +144,10 @@ const getNearestStationName = async (lon, lat) => {
         if (response.data?.response?.body?.items && response.data.response.body.items.length > 0) {
             const nearestStation = response.data.response.body.items[0];
             const stationName = nearestStation.stationName;
-            log('debug', `Found nearest air quality station: ${stationName}`);
+            logger.debug(`Found nearest air quality station: ${stationName}`);
             return stationName;
         } else {
-            log('warn', `No nearby air quality station found for TM coords (${tmCoords.x}, ${tmCoords.y}) or invalid API response format.`);
+            logger.warn(`No nearby air quality station found for TM coords (${tmCoords.x}, ${tmCoords.y}) or invalid API response format.`);
             throw new WeatherError('가까운 측정소를 찾을 수 없거나 API 응답 형식이 올바르지 않습니다.', 404);
         }
 
@@ -163,7 +163,7 @@ const getNearestStationName = async (lon, lat) => {
         } else {
             errorMessage = error.message;
         }
-        log('error', `Error fetching nearest station: ${errorMessage}`);
+        logger.error(`Error fetching nearest station: ${errorMessage}`);
         throw new WeatherError(errorMessage, statusCode);
     }
 };
@@ -178,12 +178,12 @@ const getAirQualityByStationName = async (stationName) => {
     const url = 'https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty';
 
     if (!serviceKey) {
-        log('error', 'AirKorea API key is missing for getAirQualityByStationName.');
+        logger.error('AirKorea API key is missing for getAirQualityByStationName.');
         // 에러를 throw하는 대신 null을 반환하여, 대기질 정보 전체가 실패하지 않도록 함
         return null; 
     }
     if (!stationName) {
-        log('warn', 'Station name is required for getAirQualityByStationName.');
+        logger.warn('Station name is required for getAirQualityByStationName.');
         return null;
     }
 
@@ -213,10 +213,10 @@ const getAirQualityByStationName = async (stationName) => {
                 khaiGrade: data.khaiGrade, // 통합대기환경지수 등급 (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨)
                 khaiValue: data.khaiValue, // 통합대기환경지수 값
             };
-            log('debug', `Fetched air quality for station ${stationName}`);
+            logger.debug(`Fetched air quality for station ${stationName}`);
             return airQualityData;
         } else {
-            log('warn', `No air quality data found for station ${stationName} or invalid API response format. Msg: ${response.data?.response?.header?.resultMsg}`);
+            logger.warn(`No air quality data found for station ${stationName} or invalid API response format. Msg: ${response.data?.response?.header?.resultMsg}`);
             return null; // 데이터 없거나 실패 시 null 반환
         }
 
@@ -227,7 +227,7 @@ const getAirQualityByStationName = async (stationName) => {
         } else {
             errorMessage = error.message;
         }
-        log('error', errorMessage);
+        logger.error(errorMessage);
         return null; // 에러 발생 시 null 반환
     }
 };
@@ -314,14 +314,14 @@ const getAirQualitySummary = async (lon, lat) => {
 
         // getAirQualityByStationName 함수가 실패하여 null을 반환했을 경우 처리
         if (!airQualityData) {
-            log('warn', `Air quality data is null for station: ${stationName}`);
+            logger.warn(`Air quality data is null for station: ${stationName}`);
             return null; 
         }
 
         return airQualityData;
 
     } catch (error) {
-        log('error', `Error in getAirQualitySummary: ${error.message}`);
+        logger.error(`Error in getAirQualitySummary: ${error.message}`);
         throw error;
     }
 };
