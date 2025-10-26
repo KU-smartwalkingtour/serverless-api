@@ -6,7 +6,7 @@ const profileRouter = require('./profile');
 const locationRouter = require('./location');
 const statsRouter = require('./stats');
 const settingsRouter = require('./settings');
-const userCourseRouter = require('./user_course');
+const userCourseRouter = require('./userCourse');
 const passwordRouter = require('./password');
 
 // 라우트 등록
