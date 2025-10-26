@@ -97,7 +97,7 @@ const seedDatabase = async () => {
             const courseData = {
                 course_id: courseId,
                 course_name: `${item.GIL_NM} 서울둘레길`,
-                course_type: 'seoul_trail',
+                course_type: 'seoultrail',
                 course_length: item.GIL_LEN ? parseFloat(item.GIL_LEN) : null,
                 course_duration: parseDuration(item.REQ_TM),
                 course_difficulty: mapDifficulty(item.LV_CD),
