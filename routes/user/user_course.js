@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
-// UserSavedCourse와 UserCourseHistory 모델을 가져옵니다.
 const { UserSavedCourse, UserCourseHistory } = require('@models');
 
 /**
@@ -17,7 +16,7 @@ const { UserSavedCourse, UserCourseHistory } = require('@models');
  * /user/courses/saved:
  *   get:
  *     summary: 사용자 저장된 코스 목록 조회
- *     tags: [User] // User 태그 사용 (명세서 기준)
+ *     tags: [User]
  *     security: [ { bearerAuth: [] } ]
  *     responses:
  *       '200':
@@ -27,7 +26,7 @@ const { UserSavedCourse, UserCourseHistory } = require('@models');
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/UserSavedCourse' // UserSavedCourse 스키마 참조 (Swagger 설정 필요)
+ *                 $ref: '#/components/schemas/UserSavedCourse'
  *       '401':
  *         description: Unauthorized.
  *       '500':
@@ -55,7 +54,7 @@ router.get('/saved', authenticateToken, async (req, res) => {
  * /user/courses/history:
  *   get:
  *     summary: 사용자 최근 본 코스 목록 조회
- *     tags: [User] // User 태그 사용 (명세서 기준)
+ *     tags: [User]
  *     security: [ { bearerAuth: [] } ]
  *     responses:
  *       '200':
@@ -65,7 +64,7 @@ router.get('/saved', authenticateToken, async (req, res) => {
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/UserCourseHistory' // UserCourseHistory 스키마 참조 (Swagger 설정 필요)
+ *                 $ref: '#/components/schemas/UserCourseHistory'
  *       '401':
  *         description: Unauthorized.
  *       '500':

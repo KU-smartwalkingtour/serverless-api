@@ -39,7 +39,6 @@ router.get('/', authenticateToken, async (req, res) => {
         const userId = req.user.id;
 
         // 사용자 설정 가져오기 (DB에서 직접 조회하여 최신 정보 보장)
-        // authenticateToken에서 가져온 req.user가 Sequelize 인스턴스라고 가정
         const userSettings = await User.findByPk(userId, {
             attributes: ['distance_unit']
         });

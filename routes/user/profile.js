@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
-const { User } = require('@models');
 const { validate, updateProfileSchema } = require('@utils/validation');
 const { User, AuthRefreshToken } = require('@models'); 
 
@@ -142,7 +141,7 @@ router.put('/', authenticateToken, validate(updateProfileSchema), async (req, re
  */
 router.delete('/', authenticateToken, async (req, res) => {
     try {
-        const user = req.user; // authenticateToken이 User 인스턴스를 반환한다고 가정
+        const user = req.user;
 
         if (!user || typeof user.destroy !== 'function') {
             const userInstance = await User.findByPk(req.user.id);
