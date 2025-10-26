@@ -6,32 +6,31 @@ const {
   getCoordinatesFromGpx,
   findNClosestCourses,
   getGpxContentFromS3,
-} = require('../utils/gpx-resolver');
-const { log } = require('../utils/logger');
-const { authenticateToken } = require('../middleware/auth');
+} = require('@utils/gpx-resolver');
+const { logger } = require('@utils/logger');
+const { authenticateToken } = require('@middleware/auth');
 
-// Import models with associations
-const { User, UserSavedCourse, UserCourseHistory } = require('../models');
+// 모델 임포트 (연관관계 포함)
+const { User, UserSavedCourse, UserCourseHistory } = require('@models');
 
 /**
  * @swagger
  * tags:
  *   name: Course
- *   description: Walking course discovery and management
+ *   description: 산책 코스 검색 및 관리
  */
 
-// Helper to log course view history
+// 코스 조회 히스토리 기록 헬퍼 함수
 const logCourseView = async (userId, courseId) => {
   try {
     await UserCourseHistory.create({
       user_id: userId,
-      provider: 's3', // Assuming s3 provider for viewed courses
+      provider: 's3', // 조회된 코스는 s3 provider로 가정
       provider_course_id: courseId.toString(),
     });
   } catch (error) {
-    log(
-      'error',
-      `Failed to log course history for user ${userId}, course ${courseId}: ${error.message}`,
+    logger.error(
+      `코스 히스토리 기록 실패 - 사용자 ${userId}, 코스 ${courseId}: ${error.message}`,
     );
   }
 };
@@ -40,7 +39,8 @@ const logCourseView = async (userId, courseId) => {
  * @swagger
  * /course/find-closest:
  *   get:
- *     summary: Find the closest walking course to a given location
+ *     summary: 현재 위치에서 가장 가까운 산책 코스 찾기
+ *     description: 주어진 위도와 경도를 기준으로 가장 가까운 산책 코스를 검색합니다.
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     parameters:
@@ -48,39 +48,41 @@ const logCourseView = async (userId, courseId) => {
  *         name: lat
  *         required: true
  *         schema: { type: number, format: float }
- *         description: User's latitude.
+ *         description: 사용자의 위도
+ *         example: 37.5665
  *       - in: query
  *         name: lon
  *         required: true
  *         schema: { type: number, format: float }
- *         description: User's longitude.
+ *         description: 사용자의 경도
+ *         example: 126.9780
  *     responses:
  *       200:
- *         description: The closest course found.
+ *         description: 가장 가까운 코스를 찾았습니다.
  *       400:
- *         description: Missing or invalid lat/lon parameters.
+ *         description: 위도 또는 경도 파라미터가 누락되었거나 유효하지 않습니다.
+ *       401:
+ *         description: 인증되지 않음
  *       404:
- *         description: No courses found.
+ *         description: 코스를 찾을 수 없습니다.
+ *       500:
+ *         description: 서버 오류
  */
 router.get('/find-closest', authenticateToken, async (req, res) => {
   try {
     const { lon, lat } = req.query;
     if (lon == null || lat == null) {
-      return res
-        .status(400)
-        .json({ error: 'Longitude(lon) and Latitude(lat) are required query parameters.' });
+      return res.status(400).json({ error: '경도(lon)와 위도(lat)는 필수 쿼리 파라미터입니다.' });
     }
     const closestCourse = await findClosestCourse(parseFloat(lat), parseFloat(lon));
     if (closestCourse) {
       res.json({ closestCourse });
     } else {
-      res
-        .status(404)
-        .json({ error: 'No courses found or unable to determine the closest course.' });
+      res.status(404).json({ error: '코스를 찾을 수 없거나 가장 가까운 코스를 결정할 수 없습니다.' });
     }
   } catch (error) {
-    log('error', `Error finding closest course: ${error.message}`);
-    res.status(500).json({ error: 'An error occurred while finding the closest course.' });
+    logger.error(`가장 가까운 코스 찾기 오류: ${error.message}`);
+    res.status(500).json({ error: '가장 가까운 코스를 찾는 중 오류가 발생했습니다.' });
   }
 });
 
@@ -88,7 +90,8 @@ router.get('/find-closest', authenticateToken, async (req, res) => {
  * @swagger
  * /course/find-n-closest:
  *   get:
- *     summary: Find the N closest walking courses to a given location
+ *     summary: 현재 위치에서 가까운 N개의 산책 코스 찾기
+ *     description: 주어진 위도와 경도를 기준으로 가까운 N개의 산책 코스를 검색합니다.
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     parameters:
@@ -96,44 +99,47 @@ router.get('/find-closest', authenticateToken, async (req, res) => {
  *         name: lat
  *         required: true
  *         schema: { type: number, format: float }
- *         description: User's latitude.
+ *         description: 사용자의 위도
+ *         example: 37.5665
  *       - in: query
  *         name: lon
  *         required: true
  *         schema: { type: number, format: float }
- *         description: User's longitude.
+ *         description: 사용자의 경도
+ *         example: 126.9780
  *       - in: query
  *         name: n
  *         required: true
  *         schema: { type: integer }
- *         description: The number of courses to find.
+ *         description: 찾을 코스의 개수
+ *         example: 5
  *     responses:
  *       200:
- *         description: A list of the N closest courses.
+ *         description: 가까운 N개의 코스 목록
  *       400:
- *         description: Missing or invalid lat/lon/n parameters.
+ *         description: 위도, 경도 또는 개수 파라미터가 누락되었거나 유효하지 않습니다.
+ *       401:
+ *         description: 인증되지 않음
  *       404:
- *         description: No courses found.
+ *         description: 코스를 찾을 수 없습니다.
+ *       500:
+ *         description: 서버 오류
  */
 router.get('/find-n-closest', authenticateToken, async (req, res) => {
   try {
     const { lon, lat, n } = req.query;
     if (lon == null || lat == null || n == null) {
-      return res
-        .status(400)
-        .json({ error: 'Longitude(lon), Latitude(lat), and N are required query parameters.' });
+      return res.status(400).json({ error: '경도(lon), 위도(lat), 개수(n)는 필수 쿼리 파라미터입니다.' });
     }
     const closestCourses = await findNClosestCourses(parseFloat(lat), parseFloat(lon), parseInt(n));
     if (closestCourses) {
       res.json({ closestCourses });
     } else {
-      res
-        .status(404)
-        .json({ error: 'No courses found or unable to determine the closest courses.' });
+      res.status(404).json({ error: '코스를 찾을 수 없거나 가장 가까운 코스들을 결정할 수 없습니다.' });
     }
   } catch (error) {
-    log('error', `Error finding closest courses: ${error.message}`);
-    res.status(500).json({ error: 'An error occurred while finding the closest courses.' });
+    logger.error(`가까운 코스들 찾기 오류: ${error.message}`);
+    res.status(500).json({ error: '가까운 코스들을 찾는 중 오류가 발생했습니다.' });
   }
 });
 
@@ -141,7 +147,8 @@ router.get('/find-n-closest', authenticateToken, async (req, res) => {
  * @swagger
  * /course/metadata:
  *   get:
- *     summary: Get metadata for a specific course
+ *     summary: 특정 코스의 메타데이터 조회
+ *     description: 코스 ID로 코스의 상세 메타데이터를 조회합니다.
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     parameters:
@@ -149,31 +156,36 @@ router.get('/find-n-closest', authenticateToken, async (req, res) => {
  *         name: courseId
  *         required: true
  *         schema: { type: string }
- *         description: The provider-specific ID of the course.
+ *         description: 코스의 제공자별 고유 ID
+ *         example: seoul_trail_001
  *     responses:
  *       200:
- *         description: The metadata for the course.
+ *         description: 코스 메타데이터
  *       400:
- *         description: Missing courseId parameter.
+ *         description: courseId 파라미터가 누락되었습니다.
+ *       401:
+ *         description: 인증되지 않음
  *       404:
- *         description: Course file not found.
+ *         description: 코스 파일을 찾을 수 없습니다.
+ *       500:
+ *         description: 서버 오류
  */
 router.get('/metadata', authenticateToken, async (req, res) => {
   try {
     const { courseId } = req.query;
     if (!courseId) {
-      return res.status(400).json({ error: 'courseId is a required query parameter.' });
+      return res.status(400).json({ error: 'courseId는 필수 쿼리 파라미터입니다.' });
     }
     const gpxContent = await getGpxContentFromS3(courseId);
     if (!gpxContent) {
-      return res.status(404).json({ error: 'Course file not found.' });
+      return res.status(404).json({ error: '코스 파일을 찾을 수 없습니다.' });
     }
     const metadata = await getCourseMetadataFromGpx(gpxContent);
     res.json(metadata);
     logCourseView(req.user.id, courseId);
   } catch (error) {
-    log('error', `Error fetching course metadata: ${error.message}`);
-    res.status(500).json({ error: 'An error occurred while fetching course metadata.' });
+    logger.error(`코스 메타데이터 조회 오류: ${error.message}`);
+    res.status(500).json({ error: '코스 메타데이터를 조회하는 중 오류가 발생했습니다.' });
   }
 });
 
@@ -181,7 +193,8 @@ router.get('/metadata', authenticateToken, async (req, res) => {
  * @swagger
  * /course/coordinates:
  *   get:
- *     summary: Get all GPS coordinates for a specific course
+ *     summary: 특정 코스의 GPS 좌표 조회
+ *     description: 코스 ID로 코스 경로의 모든 GPS 좌표를 조회합니다.
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     parameters:
@@ -189,31 +202,36 @@ router.get('/metadata', authenticateToken, async (req, res) => {
  *         name: courseId
  *         required: true
  *         schema: { type: string }
- *         description: The provider-specific ID of the course.
+ *         description: 코스의 제공자별 고유 ID
+ *         example: seoul_trail_001
  *     responses:
  *       200:
- *         description: An array of coordinates for the course path.
+ *         description: 코스 경로의 좌표 배열
  *       400:
- *         description: Missing courseId parameter.
+ *         description: courseId 파라미터가 누락되었습니다.
+ *       401:
+ *         description: 인증되지 않음
  *       404:
- *         description: Course file not found.
+ *         description: 코스 파일을 찾을 수 없습니다.
+ *       500:
+ *         description: 서버 오류
  */
 router.get('/coordinates', authenticateToken, async (req, res) => {
   try {
     const { courseId } = req.query;
     if (!courseId) {
-      return res.status(400).json({ error: 'courseId is a required query parameter.' });
+      return res.status(400).json({ error: 'courseId는 필수 쿼리 파라미터입니다.' });
     }
     const gpxContent = await getGpxContentFromS3(courseId);
     if (!gpxContent) {
-      return res.status(404).json({ error: 'Course file not found.' });
+      return res.status(404).json({ error: '코스 파일을 찾을 수 없습니다.' });
     }
     const coordinates = await getCoordinatesFromGpx(gpxContent);
     res.json(coordinates);
     logCourseView(req.user.id, courseId);
   } catch (error) {
-    log('error', `Error fetching course coordinates: ${error.message}`);
-    res.status(500).json({ error: 'An error occurred while fetching course coordinates.' });
+    logger.error(`코스 좌표 조회 오류: ${error.message}`);
+    res.status(500).json({ error: '코스 좌표를 조회하는 중 오류가 발생했습니다.' });
   }
 });
 
@@ -221,18 +239,23 @@ router.get('/coordinates', authenticateToken, async (req, res) => {
  * @swagger
  * /course/saved:
  *   get:
- *     summary: Get all courses saved by the user
+ *     summary: 사용자가 저장한 모든 코스 조회
+ *     description: 사용자가 저장한 코스 목록을 최신순으로 조회합니다.
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     responses:
  *       200:
- *         description: A list of saved course records.
+ *         description: 저장된 코스 목록
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/UserSavedCourse'
+ *       401:
+ *         description: 인증되지 않음
+ *       500:
+ *         description: 서버 오류
  */
 router.get('/saved', authenticateToken, async (req, res) => {
   try {
@@ -242,8 +265,8 @@ router.get('/saved', authenticateToken, async (req, res) => {
     });
     res.json(savedCourses);
   } catch (error) {
-    log('error', `Error fetching saved courses: ${error.message}`);
-    res.status(500).json({ error: 'An error occurred.' });
+    logger.error(`저장된 코스 조회 오류: ${error.message}`);
+    res.status(500).json({ error: '저장된 코스를 조회하는 중 오류가 발생했습니다.' });
   }
 });
 
@@ -251,18 +274,23 @@ router.get('/saved', authenticateToken, async (req, res) => {
  * @swagger
  * /course/history:
  *   get:
- *     summary: Get the user's recently viewed course history
+ *     summary: 사용자의 최근 코스 조회 히스토리
+ *     description: 사용자가 최근에 조회한 코스 히스토리를 최신순으로 조회합니다 (최대 50개).
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     responses:
  *       200:
- *         description: A list of recently viewed course records.
+ *         description: 최근 조회한 코스 목록
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/UserCourseHistory'
+ *       401:
+ *         description: 인증되지 않음
+ *       500:
+ *         description: 서버 오류
  */
 router.get('/history', authenticateToken, async (req, res) => {
   try {
@@ -273,8 +301,8 @@ router.get('/history', authenticateToken, async (req, res) => {
     });
     res.json(history);
   } catch (error) {
-    log('error', `Error fetching course history: ${error.message}`);
-    res.status(500).json({ error: 'An error occurred.' });
+    logger.error(`코스 히스토리 조회 오류: ${error.message}`);
+    res.status(500).json({ error: '코스 히스토리를 조회하는 중 오류가 발생했습니다.' });
   }
 });
 
@@ -282,7 +310,8 @@ router.get('/history', authenticateToken, async (req, res) => {
  * @swagger
  * /course/save:
  *   post:
- *     summary: Save a course to the user's list
+ *     summary: 코스를 사용자 목록에 저장
+ *     description: 지정된 코스를 사용자의 저장 목록에 추가합니다.
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     requestBody:
@@ -296,29 +325,33 @@ router.get('/history', authenticateToken, async (req, res) => {
  *               provider:
  *                 type: string
  *                 enum: [seoul_trail, durunubi]
- *                 description: The source of the course.
+ *                 description: 코스의 제공자
+ *                 example: seoul_trail
  *               courseId:
  *                 type: string
- *                 description: The provider-specific ID of the course to save.
+ *                 description: 저장할 코스의 제공자별 고유 ID
+ *                 example: seoul_trail_001
  *     responses:
  *       201:
- *         description: Course saved successfully.
+ *         description: 코스가 성공적으로 저장되었습니다.
  *       200:
- *         description: Course was already saved.
+ *         description: 코스가 이미 저장되어 있습니다.
  *       400:
- *         description: Missing or invalid parameters.
+ *         description: 파라미터가 누락되었거나 유효하지 않습니다.
+ *       401:
+ *         description: 인증되지 않음
+ *       500:
+ *         description: 서버 오류
  */
 router.post('/save', authenticateToken, async (req, res) => {
   try {
     const { provider, courseId } = req.body;
     if (!courseId || !provider) {
-      return res.status(400).json({ error: 'provider and courseId are required.' });
+      return res.status(400).json({ error: 'provider와 courseId는 필수입니다.' });
     }
 
     if (!['seoul_trail', 'durunubi'].includes(provider)) {
-      return res
-        .status(400)
-        .json({ error: "Provider must be one of 'seoul_trail' or 'durunubi'." });
+      return res.status(400).json({ error: "제공자는 'seoul_trail' 또는 'durunubi' 중 하나여야 합니다." });
     }
 
     const [savedCourse, created] = await UserSavedCourse.findOrCreate({
@@ -330,13 +363,13 @@ router.post('/save', authenticateToken, async (req, res) => {
     });
 
     if (created) {
-      res.status(201).json({ message: 'Course saved successfully.', data: savedCourse });
+      res.status(201).json({ message: '코스가 성공적으로 저장되었습니다.', data: savedCourse });
     } else {
-      res.status(200).json({ message: 'Course was already saved.', data: savedCourse });
+      res.status(200).json({ message: '코스가 이미 저장되어 있습니다.', data: savedCourse });
     }
   } catch (error) {
-    log('error', `Error saving course: ${error.message}`);
-    res.status(500).json({ error: 'An error occurred.' });
+    logger.error(`코스 저장 오류: ${error.message}`);
+    res.status(500).json({ error: '코스를 저장하는 중 오류가 발생했습니다.' });
   }
 });
 
@@ -344,7 +377,8 @@ router.post('/save', authenticateToken, async (req, res) => {
  * @swagger
  * /course/unsave:
  *   post:
- *     summary: Unsave a course from the user's list
+ *     summary: 코스를 사용자 목록에서 삭제
+ *     description: 저장된 코스를 사용자의 저장 목록에서 제거합니다.
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     requestBody:
@@ -358,29 +392,33 @@ router.post('/save', authenticateToken, async (req, res) => {
  *               provider:
  *                 type: string
  *                 enum: [seoul_trail, durunubi]
- *                 description: The source of the course.
+ *                 description: 코스의 제공자
+ *                 example: seoul_trail
  *               courseId:
  *                 type: string
- *                 description: The provider-specific ID of the course to unsave.
+ *                 description: 삭제할 코스의 제공자별 고유 ID
+ *                 example: seoul_trail_001
  *     responses:
  *       200:
- *         description: Course unsaved successfully.
+ *         description: 코스가 성공적으로 삭제되었습니다.
  *       404:
- *         description: Course not found in saved list.
+ *         description: 저장 목록에서 코스를 찾을 수 없습니다.
  *       400:
- *         description: Missing or invalid parameters.
+ *         description: 파라미터가 누락되었거나 유효하지 않습니다.
+ *       401:
+ *         description: 인증되지 않음
+ *       500:
+ *         description: 서버 오류
  */
 router.post('/unsave', authenticateToken, async (req, res) => {
   try {
     const { provider, courseId } = req.body;
     if (!courseId || !provider) {
-      return res.status(400).json({ error: 'provider and courseId are required.' });
+      return res.status(400).json({ error: 'provider와 courseId는 필수입니다.' });
     }
 
     if (!['seoul_trail', 'durunubi'].includes(provider)) {
-      return res
-        .status(400)
-        .json({ error: "Provider must be one of 'seoul_trail' or 'durunubi'." });
+      return res.status(400).json({ error: "제공자는 'seoul_trail' 또는 'durunubi' 중 하나여야 합니다." });
     }
 
     const deletedCount = await UserSavedCourse.destroy({
@@ -392,13 +430,13 @@ router.post('/unsave', authenticateToken, async (req, res) => {
     });
 
     if (deletedCount > 0) {
-      res.status(200).json({ message: 'Course unsaved successfully.' });
+      res.status(200).json({ message: '코스가 성공적으로 삭제되었습니다.' });
     } else {
-      res.status(404).json({ message: 'Course not found in saved list.' });
+      res.status(404).json({ message: '저장 목록에서 코스를 찾을 수 없습니다.' });
     }
   } catch (error) {
-    log('error', `Error unsaving course: ${error.message}`);
-    res.status(500).json({ error: 'An error occurred.' });
+    logger.error(`코스 삭제 오류: ${error.message}`);
+    res.status(500).json({ error: '코스를 삭제하는 중 오류가 발생했습니다.' });
   }
 });
 

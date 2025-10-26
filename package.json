@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "dev": "nodemon index.js",
+    "dev": "nodemon",
     "docker:build": "docker build --no-cache -t cloudwebservice-server:optimized .",
     "format": "prettier --write ."
   },
@@ -23,17 +23,28 @@
     "express": "^5.1.0",
     "gpx-parse": "^0.10.4",
     "jsonwebtoken": "^9.0.2",
+    "module-alias": "^2.2.3",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
+    "pino": "^10.1.0",
+    "pino-pretty": "^13.1.2",
     "sequelize": "^6.37.7",
     "sqlite3": "^5.1.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "xml2js": "^0.6.2"
+    "xml2js": "^0.6.2",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2"
+  },
+  "_moduleAliases": {
+    "@models": "./models",
+    "@routes": "./routes",
+    "@utils": "./utils",
+    "@middleware": "./middleware",
+    "@config": "./config"
   }
 }

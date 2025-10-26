@@ -1,10 +1,25 @@
-const getTimestamp = () => {
-  const now = new Date();
-  return now.toISOString();
+const pino = require('pino');
+
+// Pino configuration
+const pinoConfig = {
+  level: process.env.LOG_LEVEL || 'info',
+  timestamp: pino.stdTimeFunctions.isoTime,
 };
 
-const log = (level, message) => {
-  console.log(`[${getTimestamp()}] [${level}] ${message}`);
-};
+// Use pino-pretty in development for human-readable logs
+if (process.env.NODE_ENV === 'development') {
+  pinoConfig.transport = {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'SYS:standard',
+      ignore: 'pid,hostname',
+      singleLine: false,
+      messageFormat: '{msg}',
+    },
+  };
+}
 
-module.exports = { log };
+const logger = pino(pinoConfig);
+
+module.exports = { logger };

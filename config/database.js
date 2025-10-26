@@ -1,4 +1,5 @@
 const { Sequelize } = require('sequelize');
+const { logger } = require('@utils/logger');
 require('dotenv').config(); // 환경 변수를 사용하기 위해 dotenv 추가
 
 /*
@@ -31,7 +32,8 @@ const sequelize = new Sequelize({
       rejectUnauthorized: false, // "임시"로 인증서 검증 비활성화
     },
   },
-  logging: console.log,
+  logging: (msg) => logger.debug(msg), // Pino logger를 사용한 SQL 쿼리 로깅
+  // 프로덕션에서는 false로 설정: logging: process.env.NODE_ENV === 'production' ? false : (msg) => logger.debug(msg),
 });
 
 module.exports = sequelize;
