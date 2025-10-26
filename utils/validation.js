@@ -78,33 +78,43 @@ const resetPasswordSchema = z.object({
 const updateProfileSchema = z.object({
   nickname: z.string().min(1, '닉네임은 최소 1자 이상이어야 합니다.').optional(),
   language: z.string().optional(),
-  distance_unit: z.enum(['km', 'mi'], {
-    errorMap: () => ({ message: '거리 단위는 km 또는 mi만 가능합니다.' }),
-  }).optional(),
+  distance_unit: z
+    .enum(['km', 'mi'], {
+      errorMap: () => ({ message: '거리 단위는 km 또는 mi만 가능합니다.' }),
+    })
+    .optional(),
 });
 
 /**
  * 위치 업데이트 스키마
  */
 const updateLocationSchema = z.object({
-  latitude: z.number({
-    required_error: '위도는 필수입니다.',
-    invalid_type_error: '위도는 숫자여야 합니다.',
-  }).min(-90, '위도는 -90 이상이어야 합니다.').max(90, '위도는 90 이하여야 합니다.'),
-  longitude: z.number({
-    required_error: '경도는 필수입니다.',
-    invalid_type_error: '경도는 숫자여야 합니다.',
-  }).min(-180, '경도는 -180 이상이어야 합니다.').max(180, '경도는 180 이하여야 합니다.'),
+  latitude: z
+    .number({
+      required_error: '위도는 필수입니다.',
+      invalid_type_error: '위도는 숫자여야 합니다.',
+    })
+    .min(-90, '위도는 -90 이상이어야 합니다.')
+    .max(90, '위도는 90 이하여야 합니다.'),
+  longitude: z
+    .number({
+      required_error: '경도는 필수입니다.',
+      invalid_type_error: '경도는 숫자여야 합니다.',
+    })
+    .min(-180, '경도는 -180 이상이어야 합니다.')
+    .max(180, '경도는 180 이하여야 합니다.'),
 });
 
 /**
  * 걷기 거리 기록 스키마
  */
 const logWalkSchema = z.object({
-  distance_km: z.number({
-    required_error: '걷기 거리는 필수입니다.',
-    invalid_type_error: '걷기 거리는 숫자여야 합니다.',
-  }).positive('걷기 거리는 양수여야 합니다.'),
+  distance_km: z
+    .number({
+      required_error: '걷기 거리는 필수입니다.',
+      invalid_type_error: '걷기 거리는 숫자여야 합니다.',
+    })
+    .positive('걷기 거리는 양수여야 합니다.'),
 });
 
 module.exports = {

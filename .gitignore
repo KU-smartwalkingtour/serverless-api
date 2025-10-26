@@ -1,6 +1,9 @@
 # Dependencies
 /node_modules
 
+# Build output
+/dist
+
 # gpx file directory
 gpx_files
 
@@ -17,3 +20,6 @@ yarn-error.log*
 
 # VS Code
 .vscode/
+
+# Claude
+CLAUDE.md

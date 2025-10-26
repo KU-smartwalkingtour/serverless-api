@@ -95,7 +95,9 @@ router.post('/walk', authenticateToken, validate(logWalkSchema), async (req, res
     const newTotal = parseFloat(stats.total_walk_distance_km) + parseFloat(distance_km);
 
     logger.info(`${distance_km}km 걷기 기록: ${req.user.email}`);
-    res.status(200).json({ message: '걷기 거리가 성공적으로 기록되었습니다.', new_total: newTotal });
+    res
+      .status(200)
+      .json({ message: '걷기 거리가 성공적으로 기록되었습니다.', new_total: newTotal });
   } catch (error) {
     logger.error(`걷기 거리 기록 중 오류 발생: ${error.message}`);
     res.status(500).json({ error: '걷기 거리 기록 처리 중 오류가 발생했습니다.' });

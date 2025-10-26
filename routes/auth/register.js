@@ -6,6 +6,20 @@ const { User } = require('@models');
 const { generateTokens } = require('@utils/auth');
 const { validate, registerSchema } = require('@utils/validation');
 
+// 상수 정의
+const BCRYPT_SALT_ROUNDS = 10;
+
+/**
+ * 사용자 정보를 안전한 형태로 변환
+ * @param {Object} user - Sequelize 사용자 객체
+ * @returns {Object} 클라이언트에 반환할 사용자 정보
+ */
+const sanitizeUser = (user) => ({
+  id: user.id,
+  email: user.email,
+  nickname: user.nickname,
+});
+
 /**
  * @swagger
  * /auth/register:
@@ -72,25 +86,45 @@ router.post('/', validate(registerSchema), async (req, res) => {
     // 기존 사용자 확인
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(409).json({ error: '이미 존재하는 이메일입니다.' });
+      logger.warn('회원가입 실패: 이메일 중복', { email });
+      return res.status(409).json({
+        error: '이미 존재하는 이메일입니다.',
+        code: 'EMAIL_ALREADY_EXISTS',
+      });
     }
 
-    // 비밀번호 해싱 및 사용자 생성
-    const password_hash = await bcrypt.hash(password, 10);
-    const newUser = await User.create({ email, password_hash, nickname });
+    // 비밀번호 해싱
+    const password_hash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
-    logger.info(`신규 사용자 등록: ${email}`);
+    // 사용자 생성
+    const newUser = await User.create({
+      email,
+      password_hash,
+      nickname,
+    });
+
+    logger.info('신규 사용자 등록 완료', {
+      userId: newUser.id,
+      email: newUser.email,
+    });
 
     // 토큰 생성
     const { accessToken, refreshToken } = await generateTokens(newUser);
+
     res.status(201).json({
       accessToken,
       refreshToken,
-      user: { id: newUser.id, email: newUser.email, nickname: newUser.nickname },
+      user: sanitizeUser(newUser),
     });
   } catch (error) {
-    logger.error(`회원가입 중 오류 발생: ${error.message}`);
-    res.status(500).json({ error: '회원가입 처리 중 오류가 발생했습니다.' });
+    logger.error('회원가입 중 예상치 못한 오류', {
+      name: error.name,
+      message: error.message,
+    });
+    res.status(500).json({
+      error: '회원가입 처리 중 오류가 발생했습니다.',
+      code: 'UNEXPECTED_ERROR',
+    });
   }
 });
 
