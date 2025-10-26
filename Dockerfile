@@ -1,40 +1,52 @@
 # Multi-stage build for optimized production image
-# Stage 1: Dependencies installation
-FROM node:20-alpine AS dependencies
+# Stage 1: Builder - Build and bundle application
+FROM node:20-alpine AS builder
 
-# Create app directory
+# Add metadata
+LABEL stage=builder
+
+# Set working directory
 WORKDIR /usr/src/app
 
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev) for potential build steps
-# Using npm ci for faster, reproducible builds
-RUN npm ci && \
+# Install ALL dependencies (including devDependencies for build)
+RUN npm install && \
     npm cache clean --force
 
-# Stage 2: Production runtime
+# Copy source code
+COPY . .
+
+# Run production build (bundling, minification, obfuscation)
+# Obfuscation is enabled by default for security
+ARG OBFUSCATE=true
+ENV OBFUSCATE=${OBFUSCATE}
+RUN npm run build
+
+# Stage 2: Production runtime - Minimal production image
 FROM node:20-alpine AS production
 
 # Add metadata labels
 LABEL maintainer="cloudwebservice-team10" \
-      description="Cloud Web Service API Server" \
-      version="1.0.0"
+      description="Cloud Web Service API Server - Optimized Build" \
+      version="1.0.0" \
+      build.type="bundled"
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Copy package files with proper ownership
-COPY --chown=node:node package*.json ./
+# Copy built application from builder stage
+COPY --from=builder --chown=node:node /usr/src/app/dist/package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production && \
+# Install ONLY production dependencies
+RUN npm install --omit=dev && \
     npm cache clean --force
 
-# Copy application code with proper ownership
-COPY --chown=node:node . .
+# Copy bundled application code
+COPY --from=builder --chown=node:node /usr/src/app/dist/index.js ./
 
-# Switch to non-root user
+# Switch to non-root user for security
 USER node
 
 # Expose application port

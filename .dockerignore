@@ -3,15 +3,18 @@
 .gitignore
 .gitattributes
 
-# Node.js
+# Node.js (will be installed in container)
 node_modules
 npm-debug.log
+yarn-debug.log
 yarn-error.log
 .npm
+.yarn
 
-# Environment files
+# Environment files (will be mounted or provided separately)
 .env
 .env.*
+!.env.example
 
 # IDE files
 .vscode
@@ -27,7 +30,6 @@ Thumbs.db
 # Documentation
 README.md
 CHANGELOG.md
-*.md
 docs/
 
 # Test files
@@ -43,11 +45,23 @@ coverage/
 .travis.yml
 
 # Docker files
-Dockerfile
+Dockerfile*
 .dockerignore
-docker-compose.yml
+docker-compose*.yml
 
-# Build artifacts
+# Build artifacts (local builds, will be built in container)
 dist/
 build/
+
+# Log files
 *.log
+
+# GPX files (runtime data)
+gpx_files/
+
+# Database files (runtime data)
+*.sqlite
+*.db
+
+# Claude
+CLAUDE.md

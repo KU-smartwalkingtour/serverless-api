@@ -32,21 +32,20 @@ const { UserSavedCourse, UserCourseHistory } = require('@models');
  *       '500':
  *         description: 서버 오류 발생
  */
-router.get('/saved', authenticateToken, async (req, res) => { 
-    try {
-        const userId = req.user.id;
+router.get('/saved', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
 
-        const savedCourses = await UserSavedCourse.findAll({
-            where: { user_id: userId },
-            order: [['saved_at', 'DESC']], // 저장된 시간 최신순 정렬
-        });
+    const savedCourses = await UserSavedCourse.findAll({
+      where: { user_id: userId },
+      order: [['saved_at', 'DESC']], // 저장된 시간 최신순 정렬
+    });
 
-        res.json(savedCourses);
-
-    } catch (error) {
-        logger.error(`Error fetching saved courses for user ${req.user.id}: ${error.message}`);
-        res.status(500).json({ error: '저장된 코스 목록을 가져오는 중 오류가 발생했습니다.' });
-    }
+    res.json(savedCourses);
+  } catch (error) {
+    logger.error(`Error fetching saved courses for user ${req.user.id}: ${error.message}`);
+    res.status(500).json({ error: '저장된 코스 목록을 가져오는 중 오류가 발생했습니다.' });
+  }
 });
 
 /**
@@ -70,22 +69,21 @@ router.get('/saved', authenticateToken, async (req, res) => {
  *       '500':
  *         description: 서버 오류 발생
  */
-router.get('/history', authenticateToken, async (req, res) => { 
-    try {
-        const userId = req.user.id;
+router.get('/history', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
 
-        const history = await UserCourseHistory.findAll({
-            where: { user_id: userId },
-            order: [['viewed_at', 'DESC']], // 본 시간 최신순 정렬
-            limit: 50, // 최근 50개 제한
-        });
+    const history = await UserCourseHistory.findAll({
+      where: { user_id: userId },
+      order: [['viewed_at', 'DESC']], // 본 시간 최신순 정렬
+      limit: 50, // 최근 50개 제한
+    });
 
-        res.json(history);
-
-    } catch (error) {
-        logger.error(`Error fetching course history for user ${userId}: ${error.message}`);
-        res.status(500).json({ error: '최근 본 코스 목록을 가져오는 중 오류가 발생했습니다.' });
-    }
+    res.json(history);
+  } catch (error) {
+    logger.error(`Error fetching course history for user ${userId}: ${error.message}`);
+    res.status(500).json({ error: '최근 본 코스 목록을 가져오는 중 오류가 발생했습니다.' });
+  }
 });
 
 module.exports = router;

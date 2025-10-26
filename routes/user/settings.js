@@ -35,35 +35,34 @@ const { User, UserSavedCourse, UserCourseHistory } = require('@models'); // User
  *                   description: 서버 오류 발생
  */
 router.get('/', authenticateToken, async (req, res) => {
-    try {
-        const userId = req.user.id;
+  try {
+    const userId = req.user.id;
 
-        // 사용자 설정 가져오기 (DB에서 직접 조회하여 최신 정보 보장)
-        const userSettings = await User.findByPk(userId, {
-            attributes: ['distance_unit']
-        });
-        const distanceUnit = userSettings ? userSettings.distance_unit : 'km'; // 사용자를 못 찾는 경우 대비
+    // 사용자 설정 가져오기 (DB에서 직접 조회하여 최신 정보 보장)
+    const userSettings = await User.findByPk(userId, {
+      attributes: ['distance_unit'],
+    });
+    const distanceUnit = userSettings ? userSettings.distance_unit : 'km'; // 사용자를 못 찾는 경우 대비
 
-        // 저장된 코스 개수 세기
-        const savedCount = await UserSavedCourse.count({
-            where: { user_id: userId }
-        });
+    // 저장된 코스 개수 세기
+    const savedCount = await UserSavedCourse.count({
+      where: { user_id: userId },
+    });
 
-        // 최근 본 코스 개수 세기
-        const historyCount = await UserCourseHistory.count({
-            where: { user_id: userId }
-        });
+    // 최근 본 코스 개수 세기
+    const historyCount = await UserCourseHistory.count({
+      where: { user_id: userId },
+    });
 
-        res.json({
-            distance_unit: distanceUnit,
-            saved_courses_count: savedCount,
-            history_courses_count: historyCount
-        });
-
-    } catch (error) {
-        logger.error(`Error fetching user settings: ${error.message}`);
-        res.status(500).json({ error: '사용자 설정을 가져오는 중 오류가 발생했습니다.' });
-    }
+    res.json({
+      distance_unit: distanceUnit,
+      saved_courses_count: savedCount,
+      history_courses_count: historyCount,
+    });
+  } catch (error) {
+    logger.error(`Error fetching user settings: ${error.message}`);
+    res.status(500).json({ error: '사용자 설정을 가져오는 중 오류가 발생했습니다.' });
+  }
 });
 
 module.exports = router;
