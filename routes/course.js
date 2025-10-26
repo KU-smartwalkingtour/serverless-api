@@ -29,9 +29,7 @@ const logCourseView = async (userId, courseId) => {
       provider_course_id: courseId.toString(),
     });
   } catch (error) {
-    logger.error(
-      `코스 히스토리 기록 실패 - 사용자 ${userId}, 코스 ${courseId}: ${error.message}`,
-    );
+    logger.error(`코스 히스토리 기록 실패 - 사용자 ${userId}, 코스 ${courseId}: ${error.message}`);
   }
 };
 
@@ -78,7 +76,9 @@ router.get('/find-closest', authenticateToken, async (req, res) => {
     if (closestCourse) {
       res.json({ closestCourse });
     } else {
-      res.status(404).json({ error: '코스를 찾을 수 없거나 가장 가까운 코스를 결정할 수 없습니다.' });
+      res
+        .status(404)
+        .json({ error: '코스를 찾을 수 없거나 가장 가까운 코스를 결정할 수 없습니다.' });
     }
   } catch (error) {
     logger.error(`가장 가까운 코스 찾기 오류: ${error.message}`);
@@ -129,13 +129,17 @@ router.get('/find-n-closest', authenticateToken, async (req, res) => {
   try {
     const { lon, lat, n } = req.query;
     if (lon == null || lat == null || n == null) {
-      return res.status(400).json({ error: '경도(lon), 위도(lat), 개수(n)는 필수 쿼리 파라미터입니다.' });
+      return res
+        .status(400)
+        .json({ error: '경도(lon), 위도(lat), 개수(n)는 필수 쿼리 파라미터입니다.' });
     }
     const closestCourses = await findNClosestCourses(parseFloat(lat), parseFloat(lon), parseInt(n));
     if (closestCourses) {
       res.json({ closestCourses });
     } else {
-      res.status(404).json({ error: '코스를 찾을 수 없거나 가장 가까운 코스들을 결정할 수 없습니다.' });
+      res
+        .status(404)
+        .json({ error: '코스를 찾을 수 없거나 가장 가까운 코스들을 결정할 수 없습니다.' });
     }
   } catch (error) {
     logger.error(`가까운 코스들 찾기 오류: ${error.message}`);
@@ -351,7 +355,9 @@ router.post('/save', authenticateToken, async (req, res) => {
     }
 
     if (!['seoul_trail', 'durunubi'].includes(provider)) {
-      return res.status(400).json({ error: "제공자는 'seoul_trail' 또는 'durunubi' 중 하나여야 합니다." });
+      return res
+        .status(400)
+        .json({ error: "제공자는 'seoul_trail' 또는 'durunubi' 중 하나여야 합니다." });
     }
 
     const [savedCourse, created] = await UserSavedCourse.findOrCreate({
@@ -418,7 +424,9 @@ router.post('/unsave', authenticateToken, async (req, res) => {
     }
 
     if (!['seoul_trail', 'durunubi'].includes(provider)) {
-      return res.status(400).json({ error: "제공자는 'seoul_trail' 또는 'durunubi' 중 하나여야 합니다." });
+      return res
+        .status(400)
+        .json({ error: "제공자는 'seoul_trail' 또는 'durunubi' 중 하나여야 합니다." });
     }
 
     const deletedCount = await UserSavedCourse.destroy({

@@ -46,7 +46,10 @@ const swaggerOptions = {
     ],
     servers: [
       { url: 'http://localhost:8000', description: '로컬 개발 서버' },
-      { url: process.env.API_SERVER_URL || 'http://localhost:8000', description: 'EC2 프로덕션 서버' },
+      {
+        url: process.env.API_SERVER_URL || 'http://localhost:8000',
+        description: 'EC2 프로덕션 서버',
+      },
     ],
   },
   apis: ['./routes/**/*.js'], // includes subdirectories

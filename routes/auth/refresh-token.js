@@ -7,6 +7,18 @@ const { Sequelize } = require('sequelize');
 const { User, AuthRefreshToken } = require('@models');
 const { validate, refreshTokenSchema } = require('@utils/validation');
 
+// 상수 정의
+const ACCESS_TOKEN_EXPIRY = '15m';
+
+/**
+ * 리프레시 토큰을 SHA256 해시로 변환
+ * @param {string} token - 원본 리프레시 토큰
+ * @returns {string} SHA256 해시 문자열
+ */
+const hashToken = (token) => {
+  return crypto.createHash('sha256').update(token).digest('hex');
+};
+
 /**
  * @swagger
  * /auth/refresh-token:
@@ -47,8 +59,10 @@ router.post('/', validate(refreshTokenSchema), async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
-    // 토큰 해시 생성 및 검증
-    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    // 토큰 해시 생성
+    const tokenHash = hashToken(refreshToken);
+
+    // 데이터베이스에서 유효한 리프레시 토큰 조회
     const storedToken = await AuthRefreshToken.findOne({
       where: {
         token_hash: tokenHash,
@@ -58,22 +72,47 @@ router.post('/', validate(refreshTokenSchema), async (req, res) => {
     });
 
     if (!storedToken) {
-      return res.status(403).json({ error: '유효하지 않거나 만료된 리프레시 토큰입니다.' });
+      logger.warn('리프레시 토큰 검증 실패: 토큰을 찾을 수 없거나 만료됨');
+      return res.status(403).json({
+        error: '유효하지 않거나 만료된 리프레시 토큰입니다.',
+        code: 'INVALID_REFRESH_TOKEN',
+      });
     }
 
-    // 사용자 조회
-    const user = await User.findByPk(storedToken.user_id);
+    // 활성 사용자 조회
+    const user = await User.findOne({
+      where: { id: storedToken.user_id, is_active: true },
+    });
+
     if (!user) {
-      return res.status(403).json({ error: '사용자를 찾을 수 없습니다.' });
+      logger.warn('토큰 갱신 실패: 사용자를 찾을 수 없거나 비활성 상태', {
+        userId: storedToken.user_id,
+      });
+      return res.status(403).json({
+        error: '사용자를 찾을 수 없습니다.',
+        code: 'USER_NOT_FOUND',
+      });
     }
 
     // 새 액세스 토큰 발급
-    const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
+      expiresIn: ACCESS_TOKEN_EXPIRY,
+    });
+
+    logger.info('액세스 토큰 갱신 완료', {
+      userId: user.id,
+    });
 
     res.json({ accessToken });
   } catch (error) {
-    logger.error(`토큰 갱신 중 오류 발생: ${error.message}`);
-    res.status(500).json({ error: '토큰 갱신 처리 중 오류가 발생했습니다.' });
+    logger.error('토큰 갱신 중 예상치 못한 오류', {
+      name: error.name,
+      message: error.message,
+    });
+    res.status(500).json({
+      error: '토큰 갱신 처리 중 오류가 발생했습니다.',
+      code: 'UNEXPECTED_ERROR',
+    });
   }
 });
 
