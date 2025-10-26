@@ -23,8 +23,11 @@ const streamToString = (stream) =>
  * @returns {Promise<Array<{lat: number, lon: number}>>} 위도, 경도 객체의 배열
  */
 const getCoordinatesFromGpx = async (gpxFileContent) => {
-  // GPX 버전 1.0을 1.1로 강제 변환하여 파서 호환성 확보
-  const compatibleGpxContent = gpxFileContent.replace('version="1.0"', 'version="1.1"');
+  // GPX 버전 호환성 확보
+  let compatibleGpxContent = gpxFileContent.replace(/version="1.0"/i, 'version="1.1"');
+  if (!compatibleGpxContent.match(/<gpx[^>]+version=/i)) {
+    compatibleGpxContent = compatibleGpxContent.replace(/<gpx/i, '<gpx version="1.1"');
+  }
 
   return new Promise((resolve, reject) => {
     gpxParse.parseGpx(compatibleGpxContent, (error, data) => {
