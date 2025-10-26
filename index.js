@@ -3,6 +3,10 @@ require('dotenv').config();
 const weatherRouter = require('./routes/weather');
 const courseRouter = require('./routes/course');
 const authRouter = require('./routes/auth'); // Add this line
+
+// 라우터 불러오기
+const medicalRouter = require('./routes/medical');
+
 const { log } = require('./utils/logger');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
@@ -60,6 +64,9 @@ app.get('/', (req, res) => {
 app.use('/auth', authRouter); // Add this line
 app.use('/weather', weatherRouter);
 app.use('/course', courseRouter);
+
+// 병원 경로 추가(라우팅)
+app.use('/medical', medicalRouter);
 
 // Database synchronization
 const sequelize = require('./config/database');
