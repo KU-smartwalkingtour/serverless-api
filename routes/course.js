@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getCourseMetadataFromGpx,
   getCoordinatesFromGpx,
   getGpxContentFromS3,
 } = require('@utils/gpx-resolver');
 const { findClosestCourse, findNClosestCourses } = require('@utils/closest-course');
+const { getCourseMetadata } = require('@utils/course-metadata');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
 
@@ -20,11 +20,11 @@ const { User, UserSavedCourse, UserCourseHistory } = require('@models');
  */
 
 // 코스 조회 히스토리 기록 헬퍼 함수
-const logCourseView = async (userId, courseId) => {
+const logCourseView = async (userId, courseId, provider) => {
   try {
     await UserCourseHistory.create({
       user_id: userId,
-      provider: 's3', // 조회된 코스는 s3 provider로 가정
+      provider: provider, // 동적으로 provider 설정
       provider_course_id: courseId.toString(),
     });
   } catch (error) {
@@ -179,13 +179,15 @@ router.get('/metadata', authenticateToken, async (req, res) => {
     if (!courseId) {
       return res.status(400).json({ error: 'courseId는 필수 쿼리 파라미터입니다.' });
     }
-    const gpxContent = await getGpxContentFromS3(courseId);
-    if (!gpxContent) {
-      return res.status(404).json({ error: '코스 파일을 찾을 수 없습니다.' });
+    const metadata = await getCourseMetadata(courseId);
+    if (!metadata) {
+      return res.status(404).json({ error: '코스를 찾을 수 없습니다.' });
     }
-    const metadata = await getCourseMetadataFromGpx(gpxContent);
     res.json(metadata);
-    logCourseView(req.user.id, courseId);
+
+    // provider를 courseId 기반으로 동적으로 결정
+    const provider = courseId.startsWith('seoultrail') ? 'seoultrail' : 'durunubi';
+    logCourseView(req.user.id, courseId, provider);
   } catch (error) {
     logger.error(`코스 메타데이터 조회 오류: ${error.message}`);
     res.status(500).json({ error: '코스 메타데이터를 조회하는 중 오류가 발생했습니다.' });
@@ -231,7 +233,6 @@ router.get('/coordinates', authenticateToken, async (req, res) => {
     }
     const coordinates = await getCoordinatesFromGpx(gpxContent);
     res.json(coordinates);
-    logCourseView(req.user.id, courseId);
   } catch (error) {
     logger.error(`코스 좌표 조회 오류: ${error.message}`);
     res.status(500).json({ error: '코스 좌표를 조회하는 중 오류가 발생했습니다.' });
