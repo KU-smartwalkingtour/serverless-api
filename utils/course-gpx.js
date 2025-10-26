@@ -106,13 +106,6 @@ const getGpxContentFromS3 = async (courseId) => {
   }
 };
 
-module.exports = {
-  getCoordinatesFromGpx,
-  getCourseMetadataFromGpx,
-  getGpxContentFromS3,
-  getCourseCoordinates,
-};
-
 /**
  * 코스 ID로 S3에서 GPX 파일을 가져와 좌표를 추출합니다.
  * @param {string} courseId - 코스 ID
@@ -124,4 +117,10 @@ const getCourseCoordinates = async (courseId) => {
     return null; // GPX 파일을 찾을 수 없음
   }
   return await getCoordinatesFromGpx(gpxContent);
+};
+
+module.exports = {
+  getCoordinatesFromGpx,
+  getGpxContentFromS3,
+  getCourseCoordinates,
 };
