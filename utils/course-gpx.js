@@ -25,6 +25,13 @@ const streamToString = (stream) =>
 const getCoordinatesFromGpx = async (gpxFileContent) => {
   return new Promise((resolve, reject) => {
     gpxParse.parseGpx(gpxFileContent, (error, data) => {
+      // --- Start of added logging ---
+      console.log('--- GPX PARSER DEBUG ---');
+      console.log('Parser Error:', error);
+      console.log('Parser Data:', JSON.stringify(data, null, 2));
+      console.log('--- END GPX PARSER DEBUG ---');
+      // --- End of added logging ---
+
       if (error) {
         logger.error(`GPX 파싱 실패: ${error.message}`);
         return reject(error);
@@ -78,8 +85,8 @@ const getCoordinatesFromGpx = async (gpxFileContent) => {
  * @param {string} courseNumber - 코스 번호
  * @returns {Promise<string|null>} GPX 파일 콘텐츠 또는 찾을 수 없으면 null
  */
-const getGpxContentFromS3 = async (courseNumber) => {
-  const fileName = `서울둘레길2.0_${courseNumber}코스.gpx`.normalize('NFD');
+const getGpxContentFromS3 = async (courseId) => {
+  const fileName = `${courseId}.gpx`;
   const key = `${GPX_PREFIX}${fileName}`;
 
   try {
@@ -91,7 +98,7 @@ const getGpxContentFromS3 = async (courseNumber) => {
     return await streamToString(response.Body);
   } catch (error) {
     if (error.name === 'NoSuchKey') {
-      logger.debug(`코스 ${courseNumber}의 GPX 파일을 찾을 수 없음`);
+      logger.debug(`코스 ${courseId}의 GPX 파일을 찾을 수 없음`);
       return null;
     }
     logger.error(`S3에서 GPX 파일 조회 실패: ${error.message}`);
@@ -103,4 +110,18 @@ module.exports = {
   getCoordinatesFromGpx,
   getCourseMetadataFromGpx,
   getGpxContentFromS3,
+  getCourseCoordinates,
+};
+
+/**
+ * 코스 ID로 S3에서 GPX 파일을 가져와 좌표를 추출합니다.
+ * @param {string} courseId - 코스 ID
+ * @returns {Promise<Array<{lat: number, lon: number}>|null>} 좌표 배열 또는 파일을 찾지 못하면 null
+ */
+const getCourseCoordinates = async (courseId) => {
+  const gpxContent = await getGpxContentFromS3(courseId);
+  if (!gpxContent) {
+    return null; // GPX 파일을 찾을 수 없음
+  }
+  return await getCoordinatesFromGpx(gpxContent);
 };

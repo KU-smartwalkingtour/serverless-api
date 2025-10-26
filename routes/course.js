@@ -1,9 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const {
-  getCoordinatesFromGpx,
-  getGpxContentFromS3,
-} = require('@utils/gpx-resolver');
+const { getCourseCoordinates } = require('@utils/course-gpx');
 const { findClosestCourse, findNClosestCourses } = require('@utils/closest-course');
 const { getCourseMetadata } = require('@utils/course-metadata');
 const { getRandomCourses } = require('@utils/random-course');
@@ -228,12 +225,15 @@ router.get('/coordinates', authenticateToken, async (req, res) => {
     if (!courseId) {
       return res.status(400).json({ error: 'courseId는 필수 쿼리 파라미터입니다.' });
     }
-    const gpxContent = await getGpxContentFromS3(courseId);
-    if (!gpxContent) {
-      return res.status(404).json({ error: '코스 파일을 찾을 수 없습니다.' });
+    const coordinates = await getCourseCoordinates(courseId);
+    if (!coordinates) {
+      return res.status(404).json({ error: '코스 파일을 찾을 수 없거나 좌표를 읽을 수 없습니다.' });
     }
-    const coordinates = await getCoordinatesFromGpx(gpxContent);
     res.json(coordinates);
+
+    // provider를 courseId 기반으로 동적으로 결정
+    const provider = courseId.startsWith('seoultrail') ? 'seoultrail' : 'durunubi';
+    logCourseView(req.user.id, courseId, provider);
   } catch (error) {
     logger.error(`코스 좌표 조회 오류: ${error.message}`);
     res.status(500).json({ error: '코스 좌표를 조회하는 중 오류가 발생했습니다.' });
