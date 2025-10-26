@@ -7,7 +7,7 @@ const { validate, updateProfileSchema } = require('@utils/validation');
 
 /**
  * @swagger
- * /user/profile:
+ * /user:
  *   get:
  *     summary: 현재 사용자 프로필 조회
  *     description: 인증된 사용자의 프로필 정보를 조회합니다.
@@ -53,7 +53,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
 /**
  * @swagger
- * /user/profile:
+ * /user:
  *   put:
  *     summary: 현재 사용자 프로필 수정
  *     description: 인증된 사용자의 프로필 정보를 업데이트합니다.
