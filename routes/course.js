@@ -6,6 +6,7 @@ const {
 } = require('@utils/gpx-resolver');
 const { findClosestCourse, findNClosestCourses } = require('@utils/closest-course');
 const { getCourseMetadata } = require('@utils/course-metadata');
+const { getRandomCourses } = require('@utils/random-course');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
 
@@ -160,7 +161,7 @@ router.get('/find-n-closest', authenticateToken, async (req, res) => {
  *         required: true
  *         schema: { type: string }
  *         description: 코스의 제공자별 고유 ID
- *         example: seoul_trail_001
+ *         example: seoultrail_1
  *     responses:
  *       200:
  *         description: 코스 메타데이터
@@ -208,7 +209,7 @@ router.get('/metadata', authenticateToken, async (req, res) => {
  *         required: true
  *         schema: { type: string }
  *         description: 코스의 제공자별 고유 ID
- *         example: seoul_trail_001
+ *         example: seoultrail_1
  *     responses:
  *       200:
  *         description: 코스 경로의 좌표 배열
@@ -236,6 +237,58 @@ router.get('/coordinates', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error(`코스 좌표 조회 오류: ${error.message}`);
     res.status(500).json({ error: '코스 좌표를 조회하는 중 오류가 발생했습니다.' });
+  }
+});
+
+/**
+ * @swagger
+ * /course/find-n-random:
+ *   get:
+ *     summary: 랜덤으로 N개의 코스 ID 조회
+ *     description: 데이터베이스에서 랜덤으로 N개의 코스를 선택하여 ID 목록을 반환합니다.
+ *     tags: [Course]
+ *     security: [ { bearerAuth: [] } ]
+ *     parameters:
+ *       - in: query
+ *         name: n
+ *         required: true
+ *         schema: { type: integer }
+ *         description: 가져올 랜덤 코스의 개수
+ *         example: 5
+ *     responses:
+ *       200:
+ *         description: 랜덤 코스 ID 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 randomCourses:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example: ["seoultrail_1", "durunubi_123", "seoultrail_8"]
+ *       400:
+ *         description: n 파라미터가 누락되었거나 유효하지 않습니다.
+ *       401:
+ *         description: 인증되지 않음
+ *       500:
+ *         description: 서버 오류
+ */
+router.get('/find-n-random', authenticateToken, async (req, res) => {
+  try {
+    const { n } = req.query;
+    const count = parseInt(n, 10);
+
+    if (isNaN(count) || count <= 0) {
+      return res.status(400).json({ error: 'n은 0보다 큰 정수여야 합니다.' });
+    }
+
+    const randomCourses = await getRandomCourses(count);
+    res.json({ randomCourses });
+  } catch (error) {
+    logger.error(`랜덤 코스 조회 오류: ${error.message}`);
+    res.status(500).json({ error: '랜덤 코스를 조회하는 중 오류가 발생했습니다.' });
   }
 });
 
