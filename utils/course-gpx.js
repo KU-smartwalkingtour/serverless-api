@@ -44,8 +44,8 @@ const getCoordinatesFromGpx = async (gpxFileContent) => {
           track.segments.forEach((segment) => {
             segment.forEach((point) => {
               rows.push({
-                lat: point.lat,
-                lon: point.lon,
+                lat: parseFloat(point.lat.toFixed(6)),
+                lon: parseFloat(point.lon.toFixed(6)),
               });
             });
           });
@@ -57,8 +57,8 @@ const getCoordinatesFromGpx = async (gpxFileContent) => {
         data.routes.forEach((route) => {
           route.points.forEach((point) => {
             rows.push({
-              lat: point.lat,
-              lon: point.lon,
+              lat: parseFloat(point.lat.toFixed(6)),
+              lon: parseFloat(point.lon.toFixed(6)),
             });
           });
         });
@@ -68,8 +68,8 @@ const getCoordinatesFromGpx = async (gpxFileContent) => {
       if (data.waypoints) {
         data.waypoints.forEach((waypoint) => {
           rows.push({
-            lat: waypoint.lat,
-            lon: waypoint.lon,
+            lat: parseFloat(waypoint.lat.toFixed(6)),
+            lon: parseFloat(waypoint.lon.toFixed(6)),
           });
         });
       }
