@@ -45,6 +45,7 @@ const { authenticateToken } = require('../middleware/auth');
  *       500:
  *         description: An error occurred while fetching weather data
  */
+
 router.get('/summary', authenticateToken, async (req, res) => { // Add authenticateToken middleware here
   try {
     const { lon, lat } = req.query;

@@ -4,8 +4,11 @@ const cookieParser = require('cookie-parser'); // Add this line
 
 const weatherRouter = require('./routes/weather');
 const courseRouter = require('./routes/course');
+
 const authRouter = require('./routes/auth');
 const userRouter = require('./routes/user'); // Add this line
+// 라우터 불러오기
+const medicalRouter = require('./routes/medical');
 
 const { log } = require('./utils/logger');
 const swaggerUi = require('swagger-ui-express');
@@ -79,6 +82,10 @@ require('./models/userCourseHistory');
 require('./models/userLocation');
 require('./models/userStat');
 
+// 병원 경로 추가(라우팅)
+app.use('/medical', medicalRouter);
+
+// Database synchronization
 const sequelize = require('./config/database');
 // Use { alter: true } in development to avoid dropping data, but be cautious.
 // In production, you should use migrations.

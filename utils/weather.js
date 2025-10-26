@@ -28,44 +28,52 @@ const getDateTimeForWeatherSummary = () => {
   return { base_date, base_time };
 };
 
-const getNxNy = async (lon, lat) => {
-  const url = 'https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph-dfs_xy_lonlat';
-  const authKey = process.env.KMA_API_KEY;
-  
-  try {
-    const response = await axios.get(url, {
-      params: {
-        lon: lon,
-        lat: lat,
-        help: 0,
-        authKey: authKey
-      }
-    });
-    // response가 
-    //{
-    //"result": {
-    //    "status": 500,
-    //    "message": "Internal Server Error. 관리자에게 문의하세요."
-    //}
-    //}
-    // 일 때 처리 해야 함.
-    console.log(response.data);
+// utils/weatherApi.js 또는 해당 파일
 
-    const lines = response.data.split('\n');
-    if (lines.length >= 3) {
-      const parts = lines[2].split(/,\s*/);
-      if (parts.length >= 4) {
-        const nx = parseInt(parts[2], 10);
-        const ny = parseInt(parts[3], 10);
-        log('debug', `coordinates to nx,ny : nx=${nx}, ny=${ny}`);
-        return { nx, ny };
-      }
+const getNxNy = async (lon, lat) => {
+    const url = 'https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph-dfs_xy_lonlat';
+    const authKey = process.env.KMA_API_KEY;
+
+    try {
+        const response = await axios.get(url, {
+            params: {
+                lon: lon,
+                lat: lat,
+                help: 0,
+                authKey: authKey
+            }
+        });
+
+        // 💡 수정 부분 시작 💡
+        // 1. 응답 데이터가 JSON 형식이고 'result' 객체를 포함하는지 확인합니다.
+        //    (기상청 오류 응답은 보통 JSON으로 옵니다.)
+        if (typeof response.data === 'object' && response.data !== null && response.data.result) {
+            const result = response.data.result;
+            // 2. HTTP 상태 코드가 성공(200)이 아니면 오류를 throw 합니다.
+            if (result.status !== 200) {
+                throw new WeatherError(`KMA NX/NY API Error: ${result.message}`, result.status);
+            }
+        }
+        
+        // 3. 정상적인 텍스트 응답(nx, ny 좌표)을 파싱합니다.
+        const lines = response.data.split('\n');
+        if (lines.length >= 3) {
+            const parts = lines[2].split(/,\s*/);
+            if (parts.length >= 4) {
+                const nx = parseInt(parts[2], 10);
+                const ny = parseInt(parts[3], 10);
+                log('debug', `coordinates to nx,ny : nx=${nx}, ny=${ny}`);
+                return { nx, ny };
+            }
+        }
+        throw new WeatherError('Invalid response format from NX/NY conversion API', 500);
+        
+    } catch (error) {
+        // Axios 오류 또는 위에서 throw한 WeatherError를 처리합니다.
+        const statusCode = error.isWeatherError ? error.statusCode : 500;
+        log('error', `Error fetching nx/ny coordinates: ${error.message}`);
+        throw new WeatherError(error.message || 'Error fetching nx/ny coordinates', statusCode);
     }
-    throw new WeatherError('Invalid response format from NX/NY conversion API', 500);
-  } catch (error) {
-    log('error', `Error fetching nx/ny coordinates: ${error.message}`);
-    throw new WeatherError('Error fetching nx/ny coordinates', 500);
-  }
 };
 
 const getWeatherSummary = async (lon, lat) => {
