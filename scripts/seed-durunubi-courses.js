@@ -2,7 +2,7 @@ const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
 const gpxParse = require('gpx-parse');
-const DurunubiCourse = require('../models/durunubiCourse');
+const Course = require('../models/course'); // 변경: Course 모델 사용
 const sequelize = require('../config/database');
 
 // --- Configuration ---
@@ -12,36 +12,20 @@ const NUM_OF_ROWS = 100;
 const GPX_DIR = path.join(__dirname, '..', 'gpx_files', 'durunubi');
 
 /**
- * Parses a YYYYMMDDHHMMSS timestamp string into a Date object.
- * @param {string} ts The timestamp string.
- * @returns {Date|null} A Date object or null if the input is invalid.
- */
-const parseTimestamp = (ts) => {
-    if (!ts || ts.length !== 14) return null;
-    return new Date(ts.replace(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1-$2-$3T$4:$5:$6'));
-};
-
-/**
- * Reads a GPX file and returns the lat/lon of the first trackpoint.
- * @param {string} gpxFilePath Full path to the GPX file.
- * @returns {Promise<{lat: number, lon: number}|null>} An object with lat/lon or null.
+ * GPX 파일에서 첫 좌표를 읽어옵니다.
  */
 const getFirstPointFromGpx = async (gpxFilePath) => {
     try {
         let gpxData = await fs.readFile(gpxFilePath, 'utf8');
-
-        // FIX: Add version="1.1" to the <gpx> tag if it's missing, as gpx-parse requires it.
         if (!gpxData.match(/<gpx[^>]+version=/i)) {
             gpxData = gpxData.replace(/<gpx/i, '<gpx version="1.1"');
         }
-
         const parsed = await new Promise((resolve, reject) => {
             gpxParse.parseGpx(gpxData, (error, data) => {
                 if (error) return reject(error);
                 resolve(data);
             });
         });
-
         const firstPoint = parsed?.tracks[0]?.segments[0]?.[0];
         if (firstPoint && firstPoint.lat && firstPoint.lon) {
             return { lat: firstPoint.lat, lon: firstPoint.lon };
@@ -56,7 +40,21 @@ const getFirstPointFromGpx = async (gpxFilePath) => {
 };
 
 /**
- * Main function to fetch course data and seed it into the database.
+ * API의 숫자 난이도를 '하', '중', '상'으로 변환합니다.
+ * @param {string} level API에서 받은 난이도 값 ("1", "2", "3")
+ * @returns {string|null}
+ */
+const mapDifficulty = (level) => {
+    switch (level) {
+        case '1': return '하';
+        case '2': return '중';
+        case '3': return '상';
+        default: return null;
+    }
+};
+
+/**
+ * 데이터베이스에 데이터를 시딩하는 메인 함수
  */
 const seedDatabase = async () => {
     console.log('Starting Durunubi course database seeding...');
@@ -84,27 +82,23 @@ Fetching API data for page: ${pageNo}...`);
                 const gpxFilePath = path.join(GPX_DIR, `${item.crsIdx}.gpx`);
                 const firstPoint = await getFirstPointFromGpx(gpxFilePath);
 
+                // 새로운 스키마에 맞게 데이터 객체 구성
                 const courseData = {
-                    crs_idx: item.crsIdx,
-                    route_idx: item.routeIdx,
-                    crs_kor_nm: item.crsKorNm,
-                    crs_dstnc: item.crsDstnc ? parseFloat(item.crsDstnc) : null,
-                    crs_totl_rqrm_hour: item.crsTotlRqrmHour ? parseInt(item.crsTotlRqrmHour, 10) : null,
-                    crs_level: item.crsLevel ? parseInt(item.crsLevel, 10) : null,
-                    crs_cycle: item.crsCycle,
-                    crs_contents: item.crsContents,
-                    crs_summary: item.crsSummary,
-                    crs_tour_info: item.crsTourInfo,
-                    traveler_info: item.travelerinfo,
-                    sigun: item.sigun,
-                    brd_div: item.brdDiv,
-                    created_time: parseTimestamp(item.createdtime),
-                    modified_time: parseTimestamp(item.modifiedtime),
-                    first_lat: firstPoint?.lat || null,
-                    first_lon: firstPoint?.lon || null,
+                    course_id: item.crsIdx,
+                    course_name: item.crsKorNm,
+                    course_type: 'durunubi', // 타입 고정
+                    course_length: item.crsDstnc ? parseFloat(item.crsDstnc) : null,
+                    course_duration: item.crsTotlRqrmHour ? parseInt(item.crsTotlRqrmHour, 10) : null, // 분 단위로 가정
+                    course_difficulty: mapDifficulty(item.crsLevel),
+                    course_description: item.crsContents,
+                    location: item.sigun,
+                    start_lat: firstPoint?.lat || null,
+                    start_lon: firstPoint?.lon || null,
                 };
 
-                await DurunubiCourse.upsert(courseData);
+                console.log(`--- Upserting Data for Course: ${courseData.course_id} ---
+`, JSON.stringify(courseData, null, 2));
+                await Course.upsert(courseData);
             });
 
             await Promise.all(upsertPromises);
