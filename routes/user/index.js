@@ -5,10 +5,12 @@ const router = express.Router();
 const profileRouter = require('./profile');
 const locationRouter = require('./location');
 const statsRouter = require('./stats');
+const passwordRouter = require('./password');
 
 // 라우트 등록
 router.use('/profile', profileRouter);
 router.use('/location', locationRouter);
 router.use('/stats', statsRouter);
+router.use('/password', passwordRouter);
 
 module.exports = router;
