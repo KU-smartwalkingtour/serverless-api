@@ -10,10 +10,8 @@ const {
 const { log } = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
 
-// Import models
-const User = require('../models/user');
-const UserSavedCourse = require('../models/userSavedCourse');
-const UserCourseHistory = require('../models/userCourseHistory');
+// Import models with associations
+const { User, UserSavedCourse, UserCourseHistory } = require('../models');
 
 /**
  * @swagger
@@ -21,13 +19,6 @@ const UserCourseHistory = require('../models/userCourseHistory');
  *   name: Course
  *   description: Walking course discovery and management
  */
-
-// Define model associations
-User.hasMany(UserSavedCourse, { foreignKey: 'user_id' });
-UserSavedCourse.belongsTo(User, { foreignKey: 'user_id' });
-
-User.hasMany(UserCourseHistory, { foreignKey: 'user_id' });
-UserCourseHistory.belongsTo(User, { foreignKey: 'user_id' });
 
 // Helper to log course view history
 const logCourseView = async (userId, courseId) => {

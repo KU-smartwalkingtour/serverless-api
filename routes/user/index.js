@@ -4,17 +4,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { Sequelize } = require('sequelize');
 
-// Import models
-const User = require('../models/user');
-const UserLocation = require('../models/userLocation');
-const UserStat = require('../models/userStat');
-
-// Define model associations
-User.hasOne(UserLocation, { foreignKey: 'user_id' });
-UserLocation.belongsTo(User, { foreignKey: 'user_id' });
-
-User.hasOne(UserStat, { foreignKey: 'user_id' });
-UserStat.belongsTo(User, { foreignKey: 'user_id' });
+// Import models with associations
+const { User, UserLocation, UserStat } = require('../models');
 
 /**
  * @swagger

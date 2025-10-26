@@ -6,17 +6,8 @@ const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { Sequelize } = require('sequelize');
 
-// Import models
-const User = require('../models/user');
-const AuthRefreshToken = require('../models/authRefreshToken');
-const PasswordResetRequest = require('../models/passwordResetRequest');
-
-// Define model associations
-User.hasMany(AuthRefreshToken, { foreignKey: 'user_id' });
-AuthRefreshToken.belongsTo(User, { foreignKey: 'user_id' });
-
-User.hasMany(PasswordResetRequest, { foreignKey: 'user_id' });
-PasswordResetRequest.belongsTo(User, { foreignKey: 'user_id' });
+// Import models with associations
+const { User, AuthRefreshToken, PasswordResetRequest } = require('../models');
 
 /**
  * @swagger

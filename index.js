@@ -73,14 +73,8 @@ app.use('/user', userRouter); // Add this line
 
 // --- Database Synchronization ---
 
-// Ensure all models are loaded before syncing
-require('./models/user');
-require('./models/authRefreshToken');
-require('./models/passwordResetRequest');
-require('./models/userSavedCourse');
-require('./models/userCourseHistory');
-require('./models/userLocation');
-require('./models/userStat');
+// Load all models with associations
+require('./models');
 
 // 병원 경로 추가(라우팅)
 app.use('/medical', medicalRouter);
