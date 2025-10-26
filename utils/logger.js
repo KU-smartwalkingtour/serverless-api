@@ -1,12 +1,12 @@
 const pino = require('pino');
 
-// Pino configuration
+// Pino 로거 설정
 const pinoConfig = {
   level: process.env.LOG_LEVEL || 'info',
   timestamp: pino.stdTimeFunctions.isoTime,
 };
 
-// Use pino-pretty in development for human-readable logs
+// 개발 환경에서 사람이 읽기 쉬운 로그를 위해 pino-pretty 사용
 if (process.env.NODE_ENV === 'development') {
   pinoConfig.transport = {
     target: 'pino-pretty',

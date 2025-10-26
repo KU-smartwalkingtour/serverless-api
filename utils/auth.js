@@ -3,15 +3,15 @@ const crypto = require('crypto');
 const { AuthRefreshToken } = require('@models');
 const { logger } = require('@utils/logger');
 
-// Token configuration constants
+// 토큰 설정 상수
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_BYTES = 64;
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Validate required environment variables
- * @throws {Error} If JWT_SECRET is not configured
+ * 필수 환경 변수 검증
+ * @throws {Error} JWT_SECRET이 설정되지 않은 경우
  */
 const validateEnvironment = () => {
   if (!process.env.JWT_SECRET) {
@@ -20,10 +20,10 @@ const validateEnvironment = () => {
 };
 
 /**
- * Generate access token and refresh token for a user
- * @param {Object} user - User object with id property
+ * 사용자를 위한 액세스 토큰 및 리프레시 토큰 생성
+ * @param {Object} user - id 속성이 있는 사용자 객체
  * @returns {Promise<{accessToken: string, refreshToken: string}>}
- * @throws {Error} If JWT_SECRET is missing or token generation fails
+ * @throws {Error} JWT_SECRET이 누락되었거나 토큰 생성이 실패한 경우
  */
 const generateTokens = async (user) => {
   try {

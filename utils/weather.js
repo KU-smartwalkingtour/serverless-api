@@ -2,14 +2,14 @@ const axios = require('axios');
 const WeatherError = require('./error');
 const { logger } = require('./logger');
 
-// Constants
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000; // 9 hours in milliseconds
-const WEATHER_API_DELAY_MINUTES = 45; // API data delay in minutes
+// 상수
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000; // 9시간 (밀리초)
+const WEATHER_API_DELAY_MINUTES = 45; // API 데이터 지연 시간 (분)
 
 /**
- * Get base date and time for weather API request
- * Weather API data is delayed by approximately 45 minutes
- * @returns {{base_date: string, base_time: string}} Date and time in KMA API format
+ * 날씨 API 요청을 위한 기준 날짜 및 시간 가져오기
+ * 날씨 API 데이터는 약 45분 지연됨
+ * @returns {{base_date: string, base_time: string}} KMA API 형식의 날짜 및 시간
  */
 const getDateTimeForWeatherSummary = () => {
   const now = new Date();
@@ -39,11 +39,11 @@ const getDateTimeForWeatherSummary = () => {
 };
 
 /**
- * Convert longitude/latitude to grid coordinates (nx, ny) used by KMA API
- * @param {number} lon - Longitude
- * @param {number} lat - Latitude
- * @returns {Promise<{nx: number, ny: number}>} Grid coordinates
- * @throws {WeatherError} If conversion fails or API returns error
+ * 경도/위도를 KMA API에서 사용하는 격자 좌표(nx, ny)로 변환
+ * @param {number} lon - 경도
+ * @param {number} lat - 위도
+ * @returns {Promise<{nx: number, ny: number}>} 격자 좌표
+ * @throws {WeatherError} 변환 실패 또는 API 오류 시
  */
 const getNxNy = async (lon, lat) => {
   const url = 'https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph-dfs_xy_lonlat';
@@ -93,11 +93,11 @@ const getNxNy = async (lon, lat) => {
 };
 
 /**
- * Get ultra short-term weather forecast summary
- * @param {number} lon - Longitude
- * @param {number} lat - Latitude
- * @returns {Promise<Array>} Array of forecast data grouped by time
- * @throws {WeatherError} If API call fails or returns error
+ * 초단기 날씨 예보 요약 가져오기
+ * @param {number} lon - 경도
+ * @param {number} lat - 위도
+ * @returns {Promise<Array>} 시간별로 그룹화된 예보 데이터 배열
+ * @throws {WeatherError} API 호출 실패 또는 오류 반환 시
  */
 const getWeatherSummary = async (lon, lat) => {
   const { nx, ny } = await getNxNy(lon, lat);

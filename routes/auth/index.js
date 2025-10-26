@@ -1,14 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-/**
- * @swagger
- * tags:
- *   name: Auth
- *   description: User authentication and authorization
- */
-
-// Import route handlers
+// 라우트 핸들러 가져오기
 const registerRouter = require('./register');
 const loginRouter = require('./login');
 const refreshTokenRouter = require('./refresh-token');
@@ -16,7 +9,7 @@ const logoutRouter = require('./logout');
 const forgotPasswordRouter = require('./forgot-password');
 const resetPasswordRouter = require('./reset-password');
 
-// Register routes
+// 라우트 등록
 router.use('/register', registerRouter);
 router.use('/login', loginRouter);
 router.use('/refresh-token', refreshTokenRouter);

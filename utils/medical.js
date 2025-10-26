@@ -2,17 +2,17 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const { logger } = require('@utils/logger');
 
-// XML parser instance (reusable)
+// XML 파서 인스턴스 (재사용 가능)
 const parser = new xml2js.Parser({ explicitArray: false });
 
-// API configuration
+// API 설정
 const ENDPOINT = process.env.NMC_HOSPITAL_ENDPOINT;
 const API_KEY = process.env.NMC_HOSPITAL_KEY;
 const DEFAULT_NUM_ROWS = 10;
 
 /**
- * Validate required environment variables
- * @throws {Error} If required environment variables are missing
+ * 필수 환경 변수 검증
+ * @throws {Error} 필수 환경 변수가 누락된 경우
  */
 const validateEnvironment = () => {
   if (!ENDPOINT || !API_KEY) {
@@ -21,12 +21,12 @@ const validateEnvironment = () => {
 };
 
 /**
- * Fetch nearby medical facilities (hospitals and pharmacies)
- * @param {string} lat - Latitude (WGS84_Y)
- * @param {string} lon - Longitude (WGS84_X)
- * @param {number} [numOfRows=10] - Number of results to return
- * @returns {Promise<Array>} Array of medical facility data (JSON)
- * @throws {Error} If API call fails or response parsing fails
+ * 주변 의료 시설 (병원 및 약국) 조회
+ * @param {string} lat - 위도 (WGS84_Y)
+ * @param {string} lon - 경도 (WGS84_X)
+ * @param {number} [numOfRows=10] - 반환할 결과 수
+ * @returns {Promise<Array>} 의료 시설 데이터 배열 (JSON)
+ * @throws {Error} API 호출 실패 또는 응답 파싱 실패 시
  */
 const fetchNearbyFacilities = async (lat, lon, numOfRows = DEFAULT_NUM_ROWS) => {
   try {
