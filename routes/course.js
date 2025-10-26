@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const {
-    findClosestCourse,
-    getCourseMetadataFromGpx,
-    getCoordinatesFromGpx,
-    findNClosestCourses,
-    getGpxContentFromS3
+  findClosestCourse,
+  getCourseMetadataFromGpx,
+  getCoordinatesFromGpx,
+  findNClosestCourses,
+  getGpxContentFromS3,
 } = require('../utils/gpx-resolver');
 const { log } = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
@@ -31,15 +31,18 @@ UserCourseHistory.belongsTo(User, { foreignKey: 'user_id' });
 
 // Helper to log course view history
 const logCourseView = async (userId, courseId) => {
-    try {
-        await UserCourseHistory.create({
-            user_id: userId,
-            provider: 's3', // Assuming s3 provider for viewed courses
-            provider_course_id: courseId.toString(),
-        });
-    } catch (error) {
-        log('error', `Failed to log course history for user ${userId}, course ${courseId}: ${error.message}`);
-    }
+  try {
+    await UserCourseHistory.create({
+      user_id: userId,
+      provider: 's3', // Assuming s3 provider for viewed courses
+      provider_course_id: courseId.toString(),
+    });
+  } catch (error) {
+    log(
+      'error',
+      `Failed to log course history for user ${userId}, course ${courseId}: ${error.message}`,
+    );
+  }
 };
 
 /**
@@ -72,13 +75,17 @@ router.get('/find-closest', authenticateToken, async (req, res) => {
   try {
     const { lon, lat } = req.query;
     if (lon == null || lat == null) {
-      return res.status(400).json({ error: 'Longitude(lon) and Latitude(lat) are required query parameters.' });
+      return res
+        .status(400)
+        .json({ error: 'Longitude(lon) and Latitude(lat) are required query parameters.' });
     }
     const closestCourse = await findClosestCourse(parseFloat(lat), parseFloat(lon));
     if (closestCourse) {
       res.json({ closestCourse });
     } else {
-      res.status(404).json({ error: 'No courses found or unable to determine the closest course.' });
+      res
+        .status(404)
+        .json({ error: 'No courses found or unable to determine the closest course.' });
     }
   } catch (error) {
     log('error', `Error finding closest course: ${error.message}`);
@@ -121,13 +128,17 @@ router.get('/find-n-closest', authenticateToken, async (req, res) => {
   try {
     const { lon, lat, n } = req.query;
     if (lon == null || lat == null || n == null) {
-      return res.status(400).json({ error: 'Longitude(lon), Latitude(lat), and N are required query parameters.' });
+      return res
+        .status(400)
+        .json({ error: 'Longitude(lon), Latitude(lat), and N are required query parameters.' });
     }
     const closestCourses = await findNClosestCourses(parseFloat(lat), parseFloat(lon), parseInt(n));
     if (closestCourses) {
       res.json({ closestCourses });
     } else {
-      res.status(404).json({ error: 'No courses found or unable to determine the closest courses.' });
+      res
+        .status(404)
+        .json({ error: 'No courses found or unable to determine the closest courses.' });
     }
   } catch (error) {
     log('error', `Error finding closest courses: ${error.message}`);
@@ -164,7 +175,7 @@ router.get('/metadata', authenticateToken, async (req, res) => {
     }
     const gpxContent = await getGpxContentFromS3(courseId);
     if (!gpxContent) {
-        return res.status(404).json({ error: 'Course file not found.' });
+      return res.status(404).json({ error: 'Course file not found.' });
     }
     const metadata = await getCourseMetadataFromGpx(gpxContent);
     res.json(metadata);
@@ -204,7 +215,7 @@ router.get('/coordinates', authenticateToken, async (req, res) => {
     }
     const gpxContent = await getGpxContentFromS3(courseId);
     if (!gpxContent) {
-        return res.status(404).json({ error: 'Course file not found.' });
+      return res.status(404).json({ error: 'Course file not found.' });
     }
     const coordinates = await getCoordinatesFromGpx(gpxContent);
     res.json(coordinates);
@@ -233,16 +244,16 @@ router.get('/coordinates', authenticateToken, async (req, res) => {
  *                 $ref: '#/components/schemas/UserSavedCourse'
  */
 router.get('/saved', authenticateToken, async (req, res) => {
-    try {
-        const savedCourses = await UserSavedCourse.findAll({
-            where: { user_id: req.user.id },
-            order: [['saved_at', 'DESC']],
-        });
-        res.json(savedCourses);
-    } catch (error) {
-        log('error', `Error fetching saved courses: ${error.message}`);
-        res.status(500).json({ error: 'An error occurred.' });
-    }
+  try {
+    const savedCourses = await UserSavedCourse.findAll({
+      where: { user_id: req.user.id },
+      order: [['saved_at', 'DESC']],
+    });
+    res.json(savedCourses);
+  } catch (error) {
+    log('error', `Error fetching saved courses: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred.' });
+  }
 });
 
 /**
@@ -263,17 +274,17 @@ router.get('/saved', authenticateToken, async (req, res) => {
  *                 $ref: '#/components/schemas/UserCourseHistory'
  */
 router.get('/history', authenticateToken, async (req, res) => {
-    try {
-        const history = await UserCourseHistory.findAll({
-            where: { user_id: req.user.id },
-            order: [['viewed_at', 'DESC']],
-            limit: 50,
-        });
-        res.json(history);
-    } catch (error) {
-        log('error', `Error fetching course history: ${error.message}`);
-        res.status(500).json({ error: 'An error occurred.' });
-    }
+  try {
+    const history = await UserCourseHistory.findAll({
+      where: { user_id: req.user.id },
+      order: [['viewed_at', 'DESC']],
+      limit: 50,
+    });
+    res.json(history);
+  } catch (error) {
+    log('error', `Error fetching course history: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred.' });
+  }
 });
 
 /**
@@ -307,33 +318,35 @@ router.get('/history', authenticateToken, async (req, res) => {
  *         description: Missing or invalid parameters.
  */
 router.post('/save', authenticateToken, async (req, res) => {
-    try {
-        const { provider, courseId } = req.body;
-        if (!courseId || !provider) {
-            return res.status(400).json({ error: 'provider and courseId are required.' });
-        }
-
-        if (!['seoul_trail', 'durunubi'].includes(provider)) {
-            return res.status(400).json({ error: "Provider must be one of 'seoul_trail' or 'durunubi'." });
-        }
-
-        const [savedCourse, created] = await UserSavedCourse.findOrCreate({
-            where: {
-                user_id: req.user.id,
-                provider: provider,
-                provider_course_id: courseId.toString(),
-            }
-        });
-
-        if (created) {
-            res.status(201).json({ message: 'Course saved successfully.', data: savedCourse });
-        } else {
-            res.status(200).json({ message: 'Course was already saved.', data: savedCourse });
-        }
-    } catch (error) {
-        log('error', `Error saving course: ${error.message}`);
-        res.status(500).json({ error: 'An error occurred.' });
+  try {
+    const { provider, courseId } = req.body;
+    if (!courseId || !provider) {
+      return res.status(400).json({ error: 'provider and courseId are required.' });
     }
+
+    if (!['seoul_trail', 'durunubi'].includes(provider)) {
+      return res
+        .status(400)
+        .json({ error: "Provider must be one of 'seoul_trail' or 'durunubi'." });
+    }
+
+    const [savedCourse, created] = await UserSavedCourse.findOrCreate({
+      where: {
+        user_id: req.user.id,
+        provider: provider,
+        provider_course_id: courseId.toString(),
+      },
+    });
+
+    if (created) {
+      res.status(201).json({ message: 'Course saved successfully.', data: savedCourse });
+    } else {
+      res.status(200).json({ message: 'Course was already saved.', data: savedCourse });
+    }
+  } catch (error) {
+    log('error', `Error saving course: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred.' });
+  }
 });
 
 /**
@@ -367,33 +380,35 @@ router.post('/save', authenticateToken, async (req, res) => {
  *         description: Missing or invalid parameters.
  */
 router.post('/unsave', authenticateToken, async (req, res) => {
-    try {
-        const { provider, courseId } = req.body;
-        if (!courseId || !provider) {
-            return res.status(400).json({ error: 'provider and courseId are required.' });
-        }
-
-        if (!['seoul_trail', 'durunubi'].includes(provider)) {
-            return res.status(400).json({ error: "Provider must be one of 'seoul_trail' or 'durunubi'." });
-        }
-
-        const deletedCount = await UserSavedCourse.destroy({
-            where: {
-                user_id: req.user.id,
-                provider: provider,
-                provider_course_id: courseId.toString(),
-            }
-        });
-
-        if (deletedCount > 0) {
-            res.status(200).json({ message: 'Course unsaved successfully.' });
-        } else {
-            res.status(404).json({ message: 'Course not found in saved list.' });
-        }
-    } catch (error) {
-        log('error', `Error unsaving course: ${error.message}`);
-        res.status(500).json({ error: 'An error occurred.' });
+  try {
+    const { provider, courseId } = req.body;
+    if (!courseId || !provider) {
+      return res.status(400).json({ error: 'provider and courseId are required.' });
     }
+
+    if (!['seoul_trail', 'durunubi'].includes(provider)) {
+      return res
+        .status(400)
+        .json({ error: "Provider must be one of 'seoul_trail' or 'durunubi'." });
+    }
+
+    const deletedCount = await UserSavedCourse.destroy({
+      where: {
+        user_id: req.user.id,
+        provider: provider,
+        provider_course_id: courseId.toString(),
+      },
+    });
+
+    if (deletedCount > 0) {
+      res.status(200).json({ message: 'Course unsaved successfully.' });
+    } else {
+      res.status(404).json({ message: 'Course not found in saved list.' });
+    }
+  } catch (error) {
+    log('error', `Error unsaving course: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred.' });
+  }
 });
 
 module.exports = router;

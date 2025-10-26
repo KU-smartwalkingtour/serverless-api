@@ -17,8 +17,6 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 });
 */
 
-
-
 // 로컬 개발 환경에서 사용할 경우 아래 설정 사용
 const sequelize = new Sequelize({
   dialect: 'postgres',
@@ -30,12 +28,10 @@ const sequelize = new Sequelize({
   dialectOptions: {
     ssl: {
       require: true,
-      rejectUnauthorized: false   // "임시"로 인증서 검증 비활성화
+      rejectUnauthorized: false, // "임시"로 인증서 검증 비활성화
     },
   },
-  logging: console.log 
+  logging: console.log,
 });
-
-
 
 module.exports = sequelize;

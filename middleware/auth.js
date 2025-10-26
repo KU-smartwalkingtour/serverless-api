@@ -12,7 +12,7 @@ const authenticateToken = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Fetch the user from the database using the ID from the token
     const user = await User.findOne({ where: { id: decoded.id, is_active: true } });
 

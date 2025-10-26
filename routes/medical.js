@@ -2,8 +2,8 @@
 
 const express = require('express');
 const router = express.Router();
-const { fetchNearbyFacilities } = require('../utils/medical'); 
-const MedicalError = require('../utils/error'); 
+const { fetchNearbyFacilities } = require('../utils/medical');
+const MedicalError = require('../utils/error');
 const { log } = require('../utils/logger');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -14,7 +14,7 @@ const { authenticateToken } = require('../middleware/auth');
  *     description: 병원 및 약국 안전 정보
  */
 
-/** 
+/**
  * @swagger
  * /medical/nearby:
  *   get:
@@ -45,38 +45,38 @@ const { authenticateToken } = require('../middleware/auth');
  *                 type: object
  */
 
-
-router.get('/nearby', /* authenticateToken, */ async (req, res) => {
+router.get(
+  '/nearby',
+  /* authenticateToken, */ async (req, res) => {
     try {
-        let { lon, lat } = req.query; 
+      let { lon, lat } = req.query;
 
-        if (!lon || !lat) {
-            return res.status(400).json({ 
-                error: 'Latitude(lat) and Longitude(lon) are required query parameters.' 
-            });
-        }
-        const isLatSwapped = parseFloat(lat) > 90 && parseFloat(lon) < 90;
+      if (!lon || !lat) {
+        return res.status(400).json({
+          error: 'Latitude(lat) and Longitude(lon) are required query parameters.',
+        });
+      }
+      const isLatSwapped = parseFloat(lat) > 90 && parseFloat(lon) < 90;
 
-        if (isLatSwapped) {
-            // 값이 뒤바뀌었으면 임시 변수를 이용해 교정합니다.
-            const temp = lat;
-            lat = lon;
-            lon = temp;
-        }
+      if (isLatSwapped) {
+        // 값이 뒤바뀌었으면 임시 변수를 이용해 교정합니다.
+        const temp = lat;
+        lat = lon;
+        lon = temp;
+      }
 
-        const medicalFacilities = await fetchNearbyFacilities(lat, lon);
-        
-        res.json(medicalFacilities);
+      const medicalFacilities = await fetchNearbyFacilities(lat, lon);
 
+      res.json(medicalFacilities);
     } catch (error) {
-        if (error instanceof MedicalError) { 
-            res.status(error.statusCode).json({ error: error.message });
-        } else {
-            log('error', `Error fetching medical data: ${error.message}`);
-            res.status(500).json({ error: 'An error occurred while fetching medical data.' });
-        }
+      if (error instanceof MedicalError) {
+        res.status(error.statusCode).json({ error: error.message });
+      } else {
+        log('error', `Error fetching medical data: ${error.message}`);
+        res.status(500).json({ error: 'An error occurred while fetching medical data.' });
+      }
     }
-});
-
+  },
+);
 
 module.exports = router;

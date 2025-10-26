@@ -26,7 +26,7 @@ const options = {
       version: '1.0.0',
       description: 'API server for ku-smartwalkingtour',
     },
-    components: { 
+    components: {
       securitySchemes: {
         bearerAuth: {
           type: 'http',
@@ -35,14 +35,14 @@ const options = {
         },
       },
     },
-    security: [ 
+    security: [
       {
         bearerAuth: [],
       },
     ],
     servers: [
-      { url: `http://localhost:${PORT}`, description: 'localhost'},
-      { url: `${process.env.API_SERVER_URL}`, description: 'ec2 server'},
+      { url: `http://localhost:${PORT}`, description: 'localhost' },
+      { url: `${process.env.API_SERVER_URL}`, description: 'ec2 server' },
     ],
   },
   apis: ['./routes/*.js'], // files containing annotations as above
@@ -90,23 +90,24 @@ const sequelize = require('./config/database');
 // Use { alter: true } in development to avoid dropping data, but be cautious.
 // In production, you should use migrations.
 const syncOptions = {
-    // alter: process.env.NODE_ENV === 'development' 
+  // alter: process.env.NODE_ENV === 'development'
 };
 
-sequelize.authenticate()
+sequelize
+  .authenticate()
   .then(() => {
     log('info', 'Database connection has been established successfully.');
     // Sync all models
-    return sequelize.sync(syncOptions); 
+    return sequelize.sync(syncOptions);
   })
   .then(() => {
     app.listen(PORT, () => {
       log('info', `Server is running on http://localhost:${PORT}`);
     });
   })
-  .catch(err => {
+  .catch((err) => {
     log('error', 'Unable to connect to the database:', err);
     console.error('name:', err.name);
     console.error('message:', err.message);
-    console.error('stack:', err.stack); 
+    console.error('stack:', err.stack);
   });

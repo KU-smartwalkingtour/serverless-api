@@ -48,8 +48,8 @@ UserStat.belongsTo(User, { foreignKey: 'user_id' });
  *         description: Unauthorized.
  */
 router.get('/profile', authenticateToken, async (req, res) => {
-    const { id, email, nickname, language, distance_unit, created_at } = req.user;
-    res.json({ id, email, nickname, language, distance_unit, created_at });
+  const { id, email, nickname, language, distance_unit, created_at } = req.user;
+  res.json({ id, email, nickname, language, distance_unit, created_at });
 });
 
 /**
@@ -78,28 +78,27 @@ router.get('/profile', authenticateToken, async (req, res) => {
  *         description: Unauthorized.
  */
 router.put('/profile', authenticateToken, async (req, res) => {
-    try {
-        const { nickname, language, distance_unit } = req.body;
-        const user = req.user;
+  try {
+    const { nickname, language, distance_unit } = req.body;
+    const user = req.user;
 
-        const updates = {};
-        if (nickname !== undefined) updates.nickname = nickname;
-        if (language !== undefined) updates.language = language;
-        if (distance_unit !== undefined) updates.distance_unit = distance_unit;
+    const updates = {};
+    if (nickname !== undefined) updates.nickname = nickname;
+    if (language !== undefined) updates.language = language;
+    if (distance_unit !== undefined) updates.distance_unit = distance_unit;
 
-        if (Object.keys(updates).length === 0) {
-            return res.status(400).json({ error: 'No update fields provided.' });
-        }
-
-        await user.update(updates);
-
-        log('info', `User profile updated for user: ${user.email}`);
-        res.status(200).json({ message: 'Profile updated successfully.' });
-
-    } catch (error) {
-        log('error', `Error updating user profile: ${error.message}`);
-        res.status(500).json({ error: 'An error occurred.' });
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No update fields provided.' });
     }
+
+    await user.update(updates);
+
+    log('info', `User profile updated for user: ${user.email}`);
+    res.status(200).json({ message: 'Profile updated successfully.' });
+  } catch (error) {
+    log('error', `Error updating user profile: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred.' });
+  }
 });
 
 /**
@@ -128,24 +127,23 @@ router.put('/profile', authenticateToken, async (req, res) => {
  *         description: Unauthorized.
  */
 router.post('/location', authenticateToken, async (req, res) => {
-    try {
-        const { latitude, longitude } = req.body;
-        if (latitude == null || longitude == null) {
-            return res.status(400).json({ error: 'Latitude and longitude are required.' });
-        }
-
-        await UserLocation.upsert({
-            user_id: req.user.id,
-            latitude,
-            longitude,
-        });
-
-        res.status(200).json({ message: 'Location updated successfully.' });
-
-    } catch (error) {
-        log('error', `Error updating user location: ${error.message}`);
-        res.status(500).json({ error: 'An error occurred.' });
+  try {
+    const { latitude, longitude } = req.body;
+    if (latitude == null || longitude == null) {
+      return res.status(400).json({ error: 'Latitude and longitude are required.' });
     }
+
+    await UserLocation.upsert({
+      user_id: req.user.id,
+      latitude,
+      longitude,
+    });
+
+    res.status(200).json({ message: 'Location updated successfully.' });
+  } catch (error) {
+    log('error', `Error updating user location: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred.' });
+  }
 });
 
 /**
@@ -166,15 +164,15 @@ router.post('/location', authenticateToken, async (req, res) => {
  *         description: Unauthorized.
  */
 router.get('/stats', authenticateToken, async (req, res) => {
-    try {
-        const [stats] = await UserStat.findOrCreate({
-            where: { user_id: req.user.id },
-        });
-        res.json(stats);
-    } catch (error) {
-        log('error', `Error fetching user stats: ${error.message}`);
-        res.status(500).json({ error: 'An error occurred.' });
-    }
+  try {
+    const [stats] = await UserStat.findOrCreate({
+      where: { user_id: req.user.id },
+    });
+    res.json(stats);
+  } catch (error) {
+    log('error', `Error fetching user stats: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred.' });
+  }
 });
 
 /**
@@ -202,27 +200,26 @@ router.get('/stats', authenticateToken, async (req, res) => {
  *         description: Unauthorized.
  */
 router.post('/stats/walk', authenticateToken, async (req, res) => {
-    try {
-        const { distance_km } = req.body;
-        if (distance_km == null || isNaN(distance_km) || distance_km < 0) {
-            return res.status(400).json({ error: 'A valid positive distance_km is required.' });
-        }
-
-        const [stats] = await UserStat.findOrCreate({
-            where: { user_id: req.user.id },
-        });
-
-        await stats.increment('total_walk_distance_km', { by: distance_km });
-
-        const newTotal = parseFloat(stats.total_walk_distance_km) + parseFloat(distance_km);
-
-        log('info', `Logged ${distance_km}km walk for user ${req.user.email}`);
-        res.status(200).json({ message: 'Walk distance logged successfully.', new_total: newTotal });
-
-    } catch (error) {
-        log('error', `Error logging walk distance: ${error.message}`);
-        res.status(500).json({ error: 'An error occurred.' });
+  try {
+    const { distance_km } = req.body;
+    if (distance_km == null || isNaN(distance_km) || distance_km < 0) {
+      return res.status(400).json({ error: 'A valid positive distance_km is required.' });
     }
+
+    const [stats] = await UserStat.findOrCreate({
+      where: { user_id: req.user.id },
+    });
+
+    await stats.increment('total_walk_distance_km', { by: distance_km });
+
+    const newTotal = parseFloat(stats.total_walk_distance_km) + parseFloat(distance_km);
+
+    log('info', `Logged ${distance_km}km walk for user ${req.user.email}`);
+    res.status(200).json({ message: 'Walk distance logged successfully.', new_total: newTotal });
+  } catch (error) {
+    log('error', `Error logging walk distance: ${error.message}`);
+    res.status(500).json({ error: 'An error occurred.' });
+  }
 });
 
 module.exports = router;

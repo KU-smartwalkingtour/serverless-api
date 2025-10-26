@@ -46,19 +46,19 @@ const { authenticateToken } = require('../middleware/auth');
  *         description: An error occurred while fetching weather data
  */
 
-router.get('/summary', authenticateToken, async (req, res) => { // Add authenticateToken middleware here
+router.get('/summary', authenticateToken, async (req, res) => {
+  // Add authenticateToken middleware here
   try {
     const { lon, lat } = req.query;
 
     if (!lon || !lat) {
-      return res.status(400).json({ 
-        error: 'Latitude(lat) and Longitude(lon) are required query parameters.' 
+      return res.status(400).json({
+        error: 'Latitude(lat) and Longitude(lon) are required query parameters.',
       });
     }
 
     const weatherSummary = await getWeatherSummary(lon, lat);
     res.json(weatherSummary);
-
   } catch (error) {
     if (error instanceof WeatherError) {
       res.status(error.statusCode).json({ error: error.message });
@@ -68,6 +68,5 @@ router.get('/summary', authenticateToken, async (req, res) => { // Add authentic
     }
   }
 });
-
 
 module.exports = router;
