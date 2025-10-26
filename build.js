@@ -47,6 +47,10 @@ const OUTPUT_FILE = path.join(DIST_DIR, 'index.js');
 // 난독화 설정 (기본값: true)
 const OBFUSCATE = process.env.OBFUSCATE !== 'false';
 
+// package.json에서 dependencies 읽어오기
+const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+const externalDependencies = Object.keys(packageJson.dependencies || {});
+
 // dist 디렉토리 초기화
 if (fs.existsSync(DIST_DIR)) {
   log.info('기존 dist/ 디렉토리 삭제 중...');
@@ -67,29 +71,7 @@ esbuild
     outfile: OUTPUT_FILE,
     minify: true, // 압축 활성화
     sourcemap: false,
-    external: [
-      // node_modules의 모든 패키지를 외부 의존성으로 처리
-      'express',
-      'sequelize',
-      'pg',
-      'pg-hstore',
-      'bcryptjs',
-      'jsonwebtoken',
-      'pino',
-      'pino-pretty',
-      'dotenv',
-      'axios',
-      'swagger-jsdoc',
-      'swagger-ui-express',
-      'zod',
-      'module-alias',
-      'cookie-parser',
-      '@aws-sdk/*',
-      'gpx-parse',
-      'proj4',
-      'sqlite3',
-      'xml2js',
-    ],
+    external: externalDependencies, // package.json의 모든 dependencies를 외부 의존성으로 처리
     banner: {
       js: '#!/usr/bin/env node',
     },
@@ -150,7 +132,6 @@ esbuild
 
     // package.json 복사 (프로덕션 의존성만)
     log.info('package.json 복사 중...');
-    const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
 
     const prodPackageJson = {
       name: packageJson.name,
