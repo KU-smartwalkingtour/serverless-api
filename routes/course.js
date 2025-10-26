@@ -1,12 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const {
-  findClosestCourse,
   getCourseMetadataFromGpx,
   getCoordinatesFromGpx,
-  findNClosestCourses,
   getGpxContentFromS3,
 } = require('@utils/gpx-resolver');
+const { findClosestCourse, findNClosestCourses } = require('@utils/closest-course');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
 

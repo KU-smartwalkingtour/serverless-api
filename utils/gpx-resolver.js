@@ -142,117 +142,6 @@ const getCourseMetadataFromGpx = async (gpxFileContent) => {
 };
 
 /**
- * Haversine 공식을 사용하여 두 GPS 좌표 간의 거리 계산
- * @param {number} lat1 - 첫 번째 지점 위도
- * @param {number} lon1 - 첫 번째 지점 경도
- * @param {number} lat2 - 두 번째 지점 위도
- * @param {number} lon2 - 두 번째 지점 경도
- * @returns {number} 킬로미터 단위 거리
- */
-const getDistance = (lat1, lon1, lat2, lon2) => {
-  const dLat = (lat2 - lat1) * DEGREES_TO_RADIANS;
-  const dLon = (lon2 - lon1) * DEGREES_TO_RADIANS;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * DEGREES_TO_RADIANS) *
-      Math.cos(lat2 * DEGREES_TO_RADIANS) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return EARTH_RADIUS_KM * c;
-};
-
-/**
- * 특정 지점에서 모든 사용 가능한 코스까지의 거리 가져오기
- * @param {number} lat - 위도
- * @param {number} lon - 경도
- * @returns {Promise<Array<{course: string, distance: number}>>} 거리가 포함된 코스 배열
- */
-const getCourseDistances = async (lat, lon) => {
-  const parser = new xml2js.Parser({ explicitArray: false });
-
-  const listCommand = new ListObjectsV2Command({
-    Bucket: BUCKET_NAME,
-    Prefix: GPX_PREFIX,
-  });
-
-  const listedObjects = await s3Client.send(listCommand);
-  if (!listedObjects.Contents) {
-    return [];
-  }
-
-  const gpxFiles = listedObjects.Contents.filter((obj) => obj.Key.endsWith('.gpx'));
-
-  const coursePromises = gpxFiles.map(async (file) => {
-    try {
-      const getCommand = new GetObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: file.Key,
-      });
-      const s3Object = await s3Client.send(getCommand);
-      const data = await streamToString(s3Object.Body);
-
-      const result = await parser.parseStringPromise(data);
-
-      const extensions = result.gpx.trk.extensions;
-      const fileLon = parseFloat(extensions['ogr:COORD_X']);
-      const fileLat = parseFloat(extensions['ogr:COORD_Y']);
-
-      if (!isNaN(fileLat) && !isNaN(fileLon)) {
-        const distance = getDistance(lat, lon, fileLat, fileLon);
-        const normalizedKey = file.Key.normalize('NFC');
-        const courseNameMatch = normalizedKey.match(/서울둘레길2\.0_(\d+)코스\.gpx/);
-        if (courseNameMatch) {
-          return { course: courseNameMatch[1], distance };
-        }
-      }
-    } catch (error) {
-      logger.error(`파일 처리 오류 ${file.Key}: ${error.message}`);
-    }
-    return null;
-  });
-
-  const courses = (await Promise.all(coursePromises)).filter(Boolean);
-  return courses;
-};
-
-/**
- * 주어진 좌표에 가장 가까운 코스 찾기
- * @param {number} lat - 위도
- * @param {number} lon - 경도
- * @returns {Promise<string|null>} 코스 번호 또는 찾을 수 없으면 null
- */
-const findClosestCourse = async (lat, lon) => {
-  const courses = await getCourseDistances(lat, lon);
-
-  if (!courses || courses.length === 0) {
-    return null;
-  }
-
-  const closestCourse = courses.reduce(
-    (min, course) => (course.distance < min.distance ? course : min),
-    courses[0],
-  );
-
-  return closestCourse.course;
-};
-
-/**
- * 주어진 좌표에 가장 가까운 N개의 코스 찾기
- * @param {number} lat - 위도
- * @param {number} lon - 경도
- * @param {number} n - 반환할 코스 수
- * @returns {Promise<Array<string>>} 거리순으로 정렬된 코스 번호 배열
- */
-const findNClosestCourses = async (lat, lon, n) => {
-  const courses = await getCourseDistances(lat, lon);
-
-  courses.sort((a, b) => a.distance - b.distance);
-
-  return courses.slice(0, n).map((c) => c.course);
-};
-
-/**
  * 코스 번호로 S3에서 GPX 파일 콘텐츠 가져오기
  * @param {string} courseNumber - 코스 번호
  * @returns {Promise<string|null>} GPX 파일 콘텐츠 또는 찾을 수 없으면 null
@@ -281,7 +170,5 @@ const getGpxContentFromS3 = async (courseNumber) => {
 module.exports = {
   getCoordinatesFromGpx,
   getCourseMetadataFromGpx,
-  findClosestCourse,
-  findNClosestCourses,
   getGpxContentFromS3,
 };
