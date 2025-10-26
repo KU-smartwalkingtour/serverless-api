@@ -80,7 +80,9 @@ const authenticateToken = async (req, res, next) => {
       message: err.message,
       path: req.path,
     });
-    return res.status(500).json({ error: '인증 처리 중 오류가 발생했습니다.', code: 'UNEXPECTED_ERROR' });
+    return res
+      .status(500)
+      .json({ error: '인증 처리 중 오류가 발생했습니다.', code: 'UNEXPECTED_ERROR' });
   }
 };
 

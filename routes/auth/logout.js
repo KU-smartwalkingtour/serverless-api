@@ -42,7 +42,9 @@ router.post('/', authenticateToken, async (req, res) => {
       },
     );
 
-    logger.info(`사용자 로그아웃 처리 완료 - 사용자 ID: ${req.user.id}, 무효화된 토큰 수: ${result[0]}`);
+    logger.info(
+      `사용자 로그아웃 처리 완료 - 사용자 ID: ${req.user.id}, 무효화된 토큰 수: ${result[0]}`,
+    );
     res.status(200).json({ message: '로그아웃이 성공적으로 완료되었습니다.' });
   } catch (error) {
     logger.error(`로그아웃 처리 중 오류: ${error.message}`, { userId: req.user.id });
