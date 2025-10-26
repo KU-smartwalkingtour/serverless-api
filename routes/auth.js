@@ -26,7 +26,7 @@ PasswordResetRequest.belongsTo(User, { foreignKey: 'user_id' });
  */
 
 // Helper function to generate tokens
-const generateTokens = async (user, res) => {
+const generateTokens = async (user) => {
     const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '15m' });
     const refreshToken = crypto.randomBytes(64).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
@@ -38,13 +38,7 @@ const generateTokens = async (user, res) => {
         expires_at: expiresAt,
     });
 
-    res.cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        expires: expiresAt,
-    });
-
-    return { accessToken };
+    return { accessToken, refreshToken };
 };
 
 /**
@@ -74,14 +68,14 @@ const generateTokens = async (user, res) => {
  *                 type: string
  *     responses:
  *       201:
- *         description: User registered successfully. Returns access token and user info.
+ *         description: User registered successfully. Returns tokens and user info.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 accessToken:
- *                   type: string
+ *                 accessToken: { type: string }
+ *                 refreshToken: { type: string }
  *                 user:
  *                   type: object
  *                   properties:
@@ -92,13 +86,10 @@ const generateTokens = async (user, res) => {
  *         description: Email and password are required
  *       409:
  *         description: User with this email already exists
- *       500:
- *         description: An error occurred during registration
  */
 router.post('/register', async (req, res) => {
     try {
         const { email, password, nickname } = req.body;
-
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required.' });
         }
@@ -112,8 +103,8 @@ router.post('/register', async (req, res) => {
         const newUser = await User.create({ email, password_hash, nickname });
 
         log('info', `New user registered: ${email}`);
-        const { accessToken } = await generateTokens(newUser, res);
-        res.status(201).json({ accessToken, user: { id: newUser.id, email: newUser.email, nickname: newUser.nickname } });
+        const { accessToken, refreshToken } = await generateTokens(newUser);
+        res.status(201).json({ accessToken, refreshToken, user: { id: newUser.id, email: newUser.email, nickname: newUser.nickname } });
 
     } catch (error) {
         log('error', `Error during registration: ${error.message}`);
@@ -133,26 +124,20 @@ router.post('/register', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - email
- *               - password
+ *             required: [email, password]
  *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               password:
- *                 type: string
- *                 format: password
+ *               email: { type: string, format: email }
+ *               password: { type: string, format: password }
  *     responses:
  *       200:
- *         description: Login successful. Returns access token and user info. Sets refreshToken cookie.
+ *         description: Login successful. Returns tokens and user info.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 accessToken:
- *                   type: string
+ *                 accessToken: { type: string }
+ *                 refreshToken: { type: string }
  *                 user:
  *                   type: object
  *                   properties:
@@ -163,13 +148,10 @@ router.post('/register', async (req, res) => {
  *         description: Email and password are required
  *       401:
  *         description: Invalid credentials
- *       500:
- *         description: An error occurred during login
  */
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required.' });
         }
@@ -188,10 +170,10 @@ router.post('/login', async (req, res) => {
             where: { user_id: user.id, revoked_at: null }
         });
 
-        const { accessToken } = await generateTokens(user, res);
+        const { accessToken, refreshToken } = await generateTokens(user);
 
         log('info', `User logged in: ${email}`);
-        res.json({ accessToken, user: { id: user.id, email: user.email, nickname: user.nickname } });
+        res.json({ accessToken, refreshToken, user: { id: user.id, email: user.email, nickname: user.nickname } });
 
     } catch (error) {
         log('error', `Error during login: ${error.message}`);
@@ -205,17 +187,15 @@ router.post('/login', async (req, res) => {
  *   post:
  *     summary: Obtain a new access token using a refresh token
  *     tags: [Auth]
- *     description: >
- *       This endpoint uses an HttpOnly cookie containing the refresh token to generate a new, short-lived access token.
- *       The client should send the refresh token in the `refreshToken` cookie, which is automatically handled by browsers.
- *       The new access token is returned in the JSON response body.
- *     parameters:
- *       - in: cookie
- *         name: refreshToken
- *         required: true
- *         schema:
- *           type: string
- *         description: The refresh token, automatically sent by the browser in an HttpOnly cookie.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken: { type: string }
  *     responses:
  *       200:
  *         description: New access token generated successfully.
@@ -224,17 +204,14 @@ router.post('/login', async (req, res) => {
  *             schema:
  *               type: object
  *               properties:
- *                 accessToken:
- *                   type: string
+ *                 accessToken: { type: string }
  *       401:
- *         description: Refresh token cookie not provided or is empty.
+ *         description: Refresh token not provided.
  *       403:
- *         description: The provided refresh token is invalid, expired, or has been revoked.
- *       500:
- *         description: An error occurred during token refresh.
+ *         description: Invalid, expired, or revoked refresh token.
  */
 router.post('/refresh-token', async (req, res) => {
-    const { refreshToken } = req.cookies;
+    const { refreshToken } = req.body;
     if (!refreshToken) {
         return res.status(401).json({ error: 'Refresh token not provided.' });
     }
@@ -272,27 +249,29 @@ router.post('/refresh-token', async (req, res) => {
  * @swagger
  * /auth/logout:
  *   post:
- *     summary: Log out the user
+ *     summary: Log out the user by revoking their refresh token
  *     tags: [Auth]
- *     description: Revokes the refresh token and clears the cookie.
- *     parameters:
- *       - in: cookie
- *         name: refreshToken
- *         schema:
- *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken: { type: string }
  *     responses:
  *       200:
- *         description: Logged out successfully
+ *         description: Logged out successfully.
  */
 router.post('/logout', async (req, res) => {
-    const { refreshToken } = req.cookies;
+    const { refreshToken } = req.body;
     if (refreshToken) {
         const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
         await AuthRefreshToken.update({ revoked_at: new Date() }, {
             where: { token_hash: tokenHash }
         });
     }
-    res.clearCookie('refreshToken');
     res.status(200).json({ message: 'Logged out successfully.' });
 });
 
@@ -317,8 +296,6 @@ router.post('/logout', async (req, res) => {
  *     responses:
  *       200:
  *         description: If a user with that email exists, a password reset code has been sent.
- *       500:
- *         description: An error occurred.
  */
 router.post('/forgot-password', async (req, res) => {
     try {
@@ -358,28 +335,16 @@ router.post('/forgot-password', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - email
- *               - code
- *               - password
+ *             required: [email, code, password]
  *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               code:
- *                 type: string
- *                 description: The 6-digit code sent to the user.
- *               password:
- *                 type: string
- *                 format: password
- *                 minLength: 8
+ *               email: { type: string, format: email }
+ *               code: { type: string, description: "The 6-digit code sent to the user." }
+ *               password: { type: string, format: password, minLength: 8 }
  *     responses:
  *       200:
  *         description: Password has been reset successfully.
  *       400:
  *         description: Invalid or expired reset code, or missing parameters.
- *       500:
- *         description: An error occurred.
  */
 router.post('/reset-password', async (req, res) => {
     try {
