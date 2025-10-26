@@ -61,11 +61,14 @@ const startServer = async () => {
     process.on('SIGTERM', () => shutdown('SIGTERM'));
     process.on('SIGINT', () => shutdown('SIGINT'));
   } catch (err) {
-    logger.error({
-      name: err.name,
-      message: err.message,
-      stack: err.stack,
-    }, '서버 시작 실패');
+    logger.error(
+      {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+      },
+      '서버 시작 실패',
+    );
     process.exit(1);
   }
 };

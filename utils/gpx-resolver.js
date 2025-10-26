@@ -231,7 +231,7 @@ const findClosestCourse = async (lat, lon) => {
 
   const closestCourse = courses.reduce(
     (min, course) => (course.distance < min.distance ? course : min),
-    courses[0]
+    courses[0],
   );
 
   return closestCourse.course;
