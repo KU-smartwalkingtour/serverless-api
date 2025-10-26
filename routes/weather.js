@@ -75,7 +75,8 @@ router.get('/summary', authenticateToken, async (req, res) => {
  * @swagger
  * /weather/airquality:
  *   get:
- *     summary: Get current air quality by coordinates
+ *     summary: 대기질 정보 조회
+ *     description: 주어진 위도와 경도에 대한 대기질 정보를 조회합니다.
  *     tags: [Weather]
  *     security:
  *       - bearerAuth: []
@@ -127,7 +128,7 @@ router.get('/airquality', authenticateToken, async (req, res) => {
     // getNearestStationName에서 발생한 에러 등 처리
     const statusCode = error instanceof WeatherError ? error.statusCode : 500;
     const message = error.message || 'An error occurred while fetching air quality data.';
-    log('error', `Error fetching air quality: ${message}`);
+    logger.error(`Error fetching air quality: ${message}`);
     res.status(statusCode).json({ error: message });
   }
 });
