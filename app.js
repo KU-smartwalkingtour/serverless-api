@@ -18,14 +18,14 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-// Swagger documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-// Swagger JSON 스펙 엔드포인트
+// Swagger JSON 스펙 엔드포인트 (Swagger UI보다 먼저 등록)
 app.get('/api-docs/json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
+
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Request logger middleware
 const requestLogger = (req, res, next) => {
