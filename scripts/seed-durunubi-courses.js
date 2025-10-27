@@ -2,8 +2,8 @@ const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
 const gpxParse = require('gpx-parse');
-const Course = require('../models/course'); // 변경: Course 모델 사용
-const sequelize = require('../config/database');
+const Course = require('@models/course'); // 변경: Course 모델 사용
+const sequelize = require('@config/database');
 
 // --- Configuration ---
 const SERVICE_KEY = '5a40b867a77d82768bdf15603346916751915bbcf0b42e66d0e764e74a9de495';

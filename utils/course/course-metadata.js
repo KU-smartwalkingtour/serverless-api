@@ -1,4 +1,4 @@
-const Course = require('../models/course');
+const { Course } = require('@models');
 
 /**
  * 데이터베이스에서 특정 코스의 메타데이터를 조회합니다.

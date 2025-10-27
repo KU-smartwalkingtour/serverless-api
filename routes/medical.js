@@ -7,13 +7,6 @@ const { authenticateToken } = require('@middleware/auth');
 
 /**
  * @swagger
- * tags:
- *   - name: Medical
- *     description: 병원 및 약국 안전 정보
- */
-
-/**
- * @swagger
  * /medical/nearby:
  *   get:
  *     tags:

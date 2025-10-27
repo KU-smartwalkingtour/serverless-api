@@ -1,5 +1,5 @@
 const { Sequelize } = require('sequelize');
-const Course = require('../models/course');
+const { Course } = require('@models');
 
 /**
  * 데이터베이스에서 랜덤으로 n개의 코스를 조회하여 ID를 반환합니다.

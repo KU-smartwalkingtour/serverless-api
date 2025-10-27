@@ -1,5 +1,5 @@
 const { Sequelize } = require('sequelize');
-const { logger } = require('../utils/logger');
+const { logger } = require('@utils/logger');
 require('dotenv').config(); // 환경 변수를 사용하기 위해 dotenv 추가
 
 /*

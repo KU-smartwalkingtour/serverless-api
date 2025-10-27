@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const Course = require('../models/course');
+const { Course } = require('@models');
 
 const EARTH_RADIUS_KM = 6371;
 const DEGREES_TO_RADIANS = Math.PI / 180;

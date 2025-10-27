@@ -2,8 +2,8 @@ const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
 const gpxParse = require('gpx-parse');
-const Course = require('../models/course');
-const sequelize = require('../config/database');
+const Course = require('@models/course');
+const sequelize = require('@config/database');
 
 // --- Configuration ---
 const API_URL = 'http://openapi.seoul.go.kr:8088/785379446563686936327a487a764e/json/viewGil/1/22';

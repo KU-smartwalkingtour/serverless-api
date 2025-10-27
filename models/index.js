@@ -7,6 +7,7 @@ const UserLocation = require('./userLocation');
 const UserStat = require('./userStat');
 const UserSavedCourse = require('./userSavedCourse');
 const UserCourseHistory = require('./userCourseHistory');
+const Course = require('./course');
 
 // Define all model associations
 // User - AuthRefreshToken (1:N)
@@ -42,4 +43,5 @@ module.exports = {
   UserStat,
   UserSavedCourse,
   UserCourseHistory,
+  Course,
 };
