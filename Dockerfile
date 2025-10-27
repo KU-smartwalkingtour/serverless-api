@@ -34,6 +34,9 @@ RUN npm ci --only=production && \
 # Copy application code with proper ownership
 COPY --chown=node:node . .
 
+# Set production environment
+ENV NODE_ENV=production
+
 # Switch to non-root user
 USER node
 
