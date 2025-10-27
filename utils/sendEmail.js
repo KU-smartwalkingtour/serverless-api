@@ -1,5 +1,4 @@
-// email.js
-import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
+const { SESv2Client, SendEmailCommand } = require("@aws-sdk/client-sesv2");
 
 // 1) SES 클라이언트 생성
 const sesClient = new SESv2Client({
