@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - deploy/prod
-      - integrated_course_info
   pull_request:
     branches:
       - deploy/prod
