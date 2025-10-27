@@ -10,7 +10,7 @@ const sesClient = new SESv2Client({
  * @param {{ toEmail: string, code: string }} params - toEmail은 메일을 보낼 주소, code는 인증 코드(6자리)
  * @returns {Promise<object>} SES 전송 결과 객체
  */
-export async function sendPasswordResetEmail({ toEmail, code }) {
+async function sendPasswordResetEmail({ toEmail, code }) {
   const command = new SendEmailCommand({
     FromEmailAddress: "no-reply@ku-smartwalkingtour.site",
     Destination: {
