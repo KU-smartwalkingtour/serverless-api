@@ -2,9 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { getCourseCoordinates } = require('@utils/course/course-gpx');
 const { getCourseMetadata } = require('@utils/course/course-metadata');
+const { getProviderFromCourseId, logCourseView } = require('@utils/course/course-helpers');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
-const { getProviderFromCourseId, logCourseView } = require('./helpers');
 
 /**
  * @swagger
