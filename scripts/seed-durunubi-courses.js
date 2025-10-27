@@ -1,3 +1,4 @@
+require('dotenv').config();
 const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
@@ -6,7 +7,7 @@ const Course = require('@models/course'); // 변경: Course 모델 사용
 const sequelize = require('@config/database');
 
 // --- Configuration ---
-const SERVICE_KEY = '5a40b867a77d82768bdf15603346916751915bbcf0b42e66d0e764e74a9de495';
+const SERVICE_KEY = process.env.DURUNUBI_SERVICE_KEY;
 const API_BASE_URL = 'https://apis.data.go.kr/B551011/Durunubi/courseList';
 const NUM_OF_ROWS = 100;
 const GPX_DIR = path.join(__dirname, '..', 'gpx_files', 'durunubi');
