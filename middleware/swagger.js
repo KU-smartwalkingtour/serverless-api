@@ -127,13 +127,21 @@ const swaggerOptions = {
         bearerAuth: [],
       },
     ],
-    servers: [
-      { url: 'http://localhost:8000', description: '로컬 개발 서버' },
-      {
-        url: process.env.API_SERVER_URL || 'http://localhost:8000',
-        description: 'EC2 프로덕션 서버',
-      },
-    ],
+    servers:
+      process.env.NODE_ENV === 'production'
+        ? [
+            {
+              url: process.env.API_SERVER_URL,
+              description: '프로덕션 서버',
+            },
+          ]
+        : [
+            { url: 'http://localhost:8000', description: '로컬 개발 서버' },
+            {
+              url: process.env.API_SERVER_URL || 'http://localhost:8000',
+              description: 'EC2 프로덕션 서버',
+            },
+          ],
   },
   apis: ['./routes/**/*.js'], // includes subdirectories
 };
