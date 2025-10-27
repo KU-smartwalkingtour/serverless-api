@@ -21,6 +21,12 @@ app.use(cookieParser());
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// Swagger JSON 스펙 엔드포인트
+app.get('/api-docs/json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
 // Request logger middleware
 const requestLogger = (req, res, next) => {
   logger.info(`요청: ${req.method} ${req.url} ${JSON.stringify(req.query)}`);
