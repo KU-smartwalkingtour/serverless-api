@@ -41,14 +41,4 @@ async function sendPasswordResetEmail({ toEmail, code }) {
   return result;
 }
 
-// 단독 실행 테스트 (node email.js로 직접 실행할 때만 동작)
-sendPasswordResetEmail({
-  toEmail: "2002msw@naver.com", // 보내보고 싶은 주소
-  code: "483921",
-})
-  .then((res) => {
-    console.log("메일 전송 성공:", res);
-  })
-  .catch((err) => {
-    console.error("메일 전송 실패:", err);
-  });
+module.exports = { sendPasswordResetEmail };
