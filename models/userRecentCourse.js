@@ -1,12 +1,14 @@
 const { DataTypes, Model } = require('sequelize');
 const sequelize = require('@config/database');
 
-class UserSavedCourse extends Model {}
+class UserRecentCourse extends Model {}
 
-UserSavedCourse.init(
+UserRecentCourse.init(
   {
+    
     user_id: {
       type: DataTypes.UUID,
+      allowNull: false,
       primaryKey: true,
       references: {
         model: 'users',
@@ -15,21 +17,18 @@ UserSavedCourse.init(
     },
     course_id: {
       type: DataTypes.TEXT,
+      allowNull: false,
       primaryKey: true,
-      references: {
-        model: 'courses',
-        key: 'course_id',
-      },
     },
   },
   {
     sequelize,
-    modelName: 'UserSavedCourse',
-    tableName: 'user_saved_courses',
+    modelName: 'UserRecentCourse',
+    tableName: 'user_recent_courses',
     timestamps: true,
-    createdAt: 'saved_at',
-    updatedAt: false,
+    createdAt: 'viewed_at',
+    updatedAt: 'updated_at',
   },
 );
 
-module.exports = UserSavedCourse;
+module.exports = UserRecentCourse;
