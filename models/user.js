@@ -34,6 +34,16 @@ const User = sequelize.define(
       allowNull: false,
       defaultValue: true,
     },
+    is_dark_mode_enabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    allow_location_storage: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
   {
     timestamps: true,
