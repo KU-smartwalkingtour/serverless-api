@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const { logger } = require('@utils/logger');
 const { Sequelize } = require('sequelize');
 const { User, PasswordResetRequest } = require('@models');
@@ -7,18 +8,22 @@ const { validate } = require('@utils/validation');
 const z = require('zod');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
-// 검증 스키마
-const verifyCodeSchema = z.object({
+// 상수 정의
+const BCRYPT_SALT_ROUNDS = 10;
+
+// 검증 + 비밀번호 재설정 스키마
+const verifyAndResetSchema = z.object({
   email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
   code: z.string().length(6, '인증 코드는 6자리여야 합니다.'),
+  newPassword: z.string().min(8, '비밀번호는 최소 8자 이상이어야 합니다.'),
 });
 
 /**
  * @swagger
  * /auth/forgot-password/verify:
  *   post:
- *     summary: 비밀번호 재설정 코드 검증
- *     description: 이메일로 받은 6자리 인증 코드를 검증합니다.
+ *     summary: 비밀번호 재설정 코드 검증 및 비밀번호 변경
+ *     description: 이메일로 받은 6자리 인증 코드를 검증하고 새로운 비밀번호로 변경합니다.
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -26,7 +31,7 @@ const verifyCodeSchema = z.object({
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, code]
+ *             required: [email, code, newPassword]
  *             properties:
  *               email:
  *                 type: string
@@ -37,9 +42,15 @@ const verifyCodeSchema = z.object({
  *                 type: string
  *                 description: 이메일로 전송된 6자리 인증 코드
  *                 example: "123456"
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 8
+ *                 description: 새로운 비밀번호 (최소 8자)
+ *                 example: newpassword123
  *     responses:
  *       200:
- *         description: 인증 코드가 유효합니다.
+ *         description: 비밀번호가 성공적으로 재설정되었습니다.
  *         content:
  *           application/json:
  *             schema:
@@ -48,9 +59,7 @@ const verifyCodeSchema = z.object({
  *                 message:
  *                   type: string
  *                   description: 성공 메시지
- *                 valid:
- *                   type: boolean
- *                   description: 검증 결과
+ *                   example: 비밀번호가 성공적으로 재설정되었습니다.
  *       400:
  *         description: 유효하지 않거나 만료된 인증 코드
  *         content:
@@ -70,9 +79,9 @@ const verifyCodeSchema = z.object({
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', validate(verifyCodeSchema), async (req, res) => {
+router.post('/', validate(verifyAndResetSchema), async (req, res) => {
   try {
-    const { email, code } = req.body;
+    const { email, code, newPassword } = req.body;
 
     // 사용자 조회
     const user = await User.findOne({ where: { email } });
@@ -99,14 +108,20 @@ router.post('/', validate(verifyCodeSchema), async (req, res) => {
       throw new ServerError(ERROR_CODES.INVALID_VERIFICATION_CODE, 400);
     }
 
-    logger.info('비밀번호 재설정 코드 검증 성공', {
+    // 새 비밀번호 해싱
+    const password_hash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+
+    // 비밀번호 업데이트 및 인증 코드 소진 처리
+    await user.update({ password_hash });
+    await resetRequest.update({ consumed: true, verified_at: new Date() });
+
+    logger.info('비밀번호 재설정 성공', {
       userId: user.id,
       email,
     });
 
     res.status(200).json({
-      message: '인증 코드가 확인되었습니다.',
-      valid: true,
+      message: '비밀번호가 성공적으로 재설정되었습니다.',
     });
   } catch (error) {
     if (ServerError.isServerError(error)) {
