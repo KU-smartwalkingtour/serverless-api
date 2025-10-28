@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
 const { UserSavedCourse, UserCourseHistory } = require('@models');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -28,9 +29,17 @@ const { UserSavedCourse, UserCourseHistory } = require('@models');
  *               items:
  *                 $ref: '#/components/schemas/UserSavedCourse'
  *       '401':
- *         description: Unauthorized.
+ *         description: 인증되지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '500':
  *         description: 서버 오류 발생
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/saved', authenticateToken, async (req, res) => {
   try {
@@ -43,8 +52,9 @@ router.get('/saved', authenticateToken, async (req, res) => {
 
     res.json(savedCourses);
   } catch (error) {
-    logger.error(`Error fetching saved courses for user ${req.user.id}: ${error.message}`);
-    res.status(500).json({ error: '저장된 코스 목록을 가져오는 중 오류가 발생했습니다.' });
+    logger.error(`저장된 코스 조회 중 오류 (user: ${req.user.id}): ${error.message}`);
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -65,9 +75,17 @@ router.get('/saved', authenticateToken, async (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/UserCourseHistory'
  *       '401':
- *         description: Unauthorized.
+ *         description: 인증되지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '500':
  *         description: 서버 오류 발생
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/history', authenticateToken, async (req, res) => {
   try {
@@ -81,8 +99,9 @@ router.get('/history', authenticateToken, async (req, res) => {
 
     res.json(history);
   } catch (error) {
-    logger.error(`Error fetching course history for user ${userId}: ${error.message}`);
-    res.status(500).json({ error: '최근 본 코스 목록을 가져오는 중 오류가 발생했습니다.' });
+    logger.error(`코스 히스토리 조회 중 오류 (user: ${req.user.id}): ${error.message}`);
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

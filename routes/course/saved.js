@@ -3,6 +3,7 @@ const router = express.Router();
 const { UserSavedCourse, UserCourseHistory } = require('@models');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -25,6 +26,10 @@ const { authenticateToken } = require('@middleware/auth');
  *         description: 인증되지 않음
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/saved', authenticateToken, async (req, res) => {
   try {
@@ -35,7 +40,8 @@ router.get('/saved', authenticateToken, async (req, res) => {
     res.json(savedCourses);
   } catch (error) {
     logger.error(`저장된 코스 조회 오류: ${error.message}`);
-    res.status(500).json({ error: '저장된 코스를 조회하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -60,6 +66,10 @@ router.get('/saved', authenticateToken, async (req, res) => {
  *         description: 인증되지 않음
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/history', authenticateToken, async (req, res) => {
   try {
@@ -71,7 +81,8 @@ router.get('/history', authenticateToken, async (req, res) => {
     res.json(history);
   } catch (error) {
     logger.error(`코스 히스토리 조회 오류: ${error.message}`);
-    res.status(500).json({ error: '코스 히스토리를 조회하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -107,22 +118,28 @@ router.get('/history', authenticateToken, async (req, res) => {
  *         description: 코스가 이미 저장되어 있습니다.
  *       400:
  *         description: 파라미터가 누락되었거나 유효하지 않습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/save', authenticateToken, async (req, res) => {
   try {
     const { provider, courseId } = req.body;
     if (!courseId || !provider) {
-      return res.status(400).json({ error: 'provider와 courseId는 필수입니다.' });
+      throw new ServerError(ERROR_CODES.MISSING_REQUIRED_FIELDS, 400);
     }
 
     if (!['seoul_trail', 'durunubi'].includes(provider)) {
-      return res
-        .status(400)
-        .json({ error: "제공자는 'seoul_trail' 또는 'durunubi' 중 하나여야 합니다." });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
 
     const [savedCourse, created] = await UserSavedCourse.findOrCreate({
@@ -139,8 +156,13 @@ router.post('/save', authenticateToken, async (req, res) => {
       res.status(200).json({ message: '코스가 이미 저장되어 있습니다.', data: savedCourse });
     }
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`코스 저장 오류: ${error.message}`);
-    res.status(500).json({ error: '코스를 저장하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -176,22 +198,28 @@ router.post('/save', authenticateToken, async (req, res) => {
  *         description: 저장 목록에서 코스를 찾을 수 없습니다.
  *       400:
  *         description: 파라미터가 누락되었거나 유효하지 않습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/unsave', authenticateToken, async (req, res) => {
   try {
     const { provider, courseId } = req.body;
     if (!courseId || !provider) {
-      return res.status(400).json({ error: 'provider와 courseId는 필수입니다.' });
+      throw new ServerError(ERROR_CODES.MISSING_REQUIRED_FIELDS, 400);
     }
 
     if (!['seoul_trail', 'durunubi'].includes(provider)) {
-      return res
-        .status(400)
-        .json({ error: "제공자는 'seoul_trail' 또는 'durunubi' 중 하나여야 합니다." });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
 
     const deletedCount = await UserSavedCourse.destroy({
@@ -208,8 +236,13 @@ router.post('/unsave', authenticateToken, async (req, res) => {
       res.status(404).json({ message: '저장 목록에서 코스를 찾을 수 없습니다.' });
     }
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`코스 삭제 오류: ${error.message}`);
-    res.status(500).json({ error: '코스를 삭제하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

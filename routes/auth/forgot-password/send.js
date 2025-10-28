@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { logger } = require('@utils/logger');
 const { User, PasswordResetRequest } = require('@models');
 const { validate, forgotPasswordSchema } = require('@utils/validation');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // 상수 정의
 const CODE_EXPIRY_MINUTES = 10;
@@ -42,10 +43,22 @@ const CODE_EXPIRY_MINUTES = 10;
  *                   description: 성공 메시지
  *       400:
  *         description: 입력값이 유효하지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: 해당 이메일로 등록된 사용자를 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/', validate(forgotPasswordSchema), async (req, res) => {
   try {
@@ -54,10 +67,7 @@ router.post('/', validate(forgotPasswordSchema), async (req, res) => {
 
     if (!user) {
       logger.warn('비밀번호 재설정 코드 전송 실패: 사용자를 찾을 수 없음', { email });
-      return res.status(404).json({
-        error: '해당 이메일로 등록된 사용자를 찾을 수 없습니다.',
-        code: 'USER_NOT_FOUND',
-      });
+      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
     }
 
     // 6자리 인증 코드 생성
@@ -86,14 +96,16 @@ router.post('/', validate(forgotPasswordSchema), async (req, res) => {
 
     res.status(200).json({ message: '해당 이메일로 비밀번호 재설정 코드가 전송되었습니다.' });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error('비밀번호 재설정 요청 중 예상치 못한 오류', {
       name: error.name,
       message: error.message,
     });
-    res.status(500).json({
-      error: '비밀번호 재설정 처리 중 오류가 발생했습니다.',
-      code: 'UNEXPECTED_ERROR',
-    });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

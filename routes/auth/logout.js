@@ -3,6 +3,7 @@ const router = express.Router();
 const { logger } = require('@utils/logger');
 const { AuthRefreshToken } = require('@models');
 const { authenticateToken } = require('@middleware/auth');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -26,8 +27,22 @@ const { authenticateToken } = require('@middleware/auth');
  *                   description: 성공 메시지
  *       401:
  *         description: 인증되지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: 접근 거부
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/', authenticateToken, async (req, res) => {
   try {
@@ -47,8 +62,13 @@ router.post('/', authenticateToken, async (req, res) => {
     );
     res.status(200).json({ message: '로그아웃이 성공적으로 완료되었습니다.' });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`로그아웃 처리 중 오류: ${error.message}`, { userId: req.user.id });
-    res.status(500).json({ error: '로그아웃 처리 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

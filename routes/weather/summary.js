@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getWeatherSummary } = require('@utils/weather');
-const WeatherError = require('@utils/error');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
 
@@ -34,12 +34,28 @@ const { authenticateToken } = require('@middleware/auth');
  *         description: 날씨 요약 정보가 성공적으로 조회되었습니다.
  *       400:
  *         description: 위도와 경도는 필수 파라미터입니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음 (토큰 미제공)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: 접근 거부 (유효하지 않은 토큰)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 날씨 데이터를 조회하는 중 오류가 발생했습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 
 router.get('/summary', authenticateToken, async (req, res) => {
@@ -47,20 +63,19 @@ router.get('/summary', authenticateToken, async (req, res) => {
     const { lon, lat } = req.query;
 
     if (!lon || !lat) {
-      return res.status(400).json({
-        error: '위도(lat)와 경도(lon)는 필수 쿼리 파라미터입니다.',
-      });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
 
     const weatherSummary = await getWeatherSummary(lon, lat);
     res.json(weatherSummary);
   } catch (error) {
-    if (error instanceof WeatherError) {
-      res.status(error.statusCode).json({ error: error.message });
-    } else {
-      logger.error(`날씨 데이터 조회 오류: ${error.message}`);
-      res.status(500).json({ error: '날씨 데이터를 조회하는 중 오류가 발생했습니다.' });
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
     }
+
+    logger.error(`날씨 데이터 조회 오류: ${error.message}`, { error: error.message });
+    const serverError = new ServerError(ERROR_CODES.WEATHER_API_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getAirQualitySummary } = require('@utils/weather');
-const WeatherError = require('@utils/error');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
 
@@ -32,19 +32,41 @@ const { authenticateToken } = require('@middleware/auth');
  *         description: Successful response with air quality data
  *       '400':
  *         description: Latitude(lat) and Longitude(lon) are required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         description: 인증되지 않음 (토큰 미제공)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '403':
+ *         description: 접근 거부 (유효하지 않은 토큰)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '404':
  *         description: Could not find nearest station or air quality data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '500':
  *         description: An error occurred while fetching data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/air-quality', authenticateToken, async (req, res) => {
   try {
     const { lon, lat } = req.query;
 
     if (!lon || !lat) {
-      return res.status(400).json({
-        error: 'Latitude(lat) and Longitude(lon) are required query parameters.',
-      });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
 
     // 새로 만든 getAirQualitySummary 함수를 호출합니다.
@@ -52,18 +74,18 @@ router.get('/air-quality', authenticateToken, async (req, res) => {
 
     if (airQualityData === null) {
       // getAirQualitySummary 내부에서 null을 반환한 경우 (API 실패 등)
-      return res
-        .status(404)
-        .json({ error: 'Air quality data is currently unavailable for this location.' });
+      throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, 404);
     }
 
     res.json(airQualityData); // 성공 시 대기 질 데이터 반환
   } catch (error) {
-    // getNearestStationName에서 발생한 에러 등 처리
-    const statusCode = error instanceof WeatherError ? error.statusCode : 500;
-    const message = error.message || 'An error occurred while fetching air quality data.';
-    logger.error(`Error fetching air quality: ${message}`);
-    res.status(statusCode).json({ error: message });
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    logger.error(`대기질 데이터 조회 오류: ${error.message}`, { error: error.message });
+    const serverError = new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

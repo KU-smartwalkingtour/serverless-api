@@ -6,6 +6,7 @@ const { logger } = require('@utils/logger');
 const { Sequelize } = require('sequelize');
 const { User, AuthRefreshToken } = require('@models');
 const { validate, refreshTokenSchema } = require('@utils/validation');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // 상수 정의
 const ACCESS_TOKEN_EXPIRY = '15m';
@@ -50,10 +51,22 @@ const hashToken = (token) => {
  *                   description: 새로 발급된 JWT 액세스 토큰
  *       400:
  *         description: 입력값이 유효하지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
  *         description: 유효하지 않거나 만료된 리프레시 토큰
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/', validate(refreshTokenSchema), async (req, res) => {
   try {
@@ -73,10 +86,7 @@ router.post('/', validate(refreshTokenSchema), async (req, res) => {
 
     if (!storedToken) {
       logger.warn('리프레시 토큰 검증 실패: 토큰을 찾을 수 없거나 만료됨');
-      return res.status(403).json({
-        error: '유효하지 않거나 만료된 리프레시 토큰입니다.',
-        code: 'INVALID_REFRESH_TOKEN',
-      });
+      throw new ServerError(ERROR_CODES.TOKEN_EXPIRED, 403);
     }
 
     // 활성 사용자 조회
@@ -88,10 +98,7 @@ router.post('/', validate(refreshTokenSchema), async (req, res) => {
       logger.warn('토큰 갱신 실패: 사용자를 찾을 수 없거나 비활성 상태', {
         userId: storedToken.user_id,
       });
-      return res.status(403).json({
-        error: '사용자를 찾을 수 없습니다.',
-        code: 'USER_NOT_FOUND',
-      });
+      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 403);
     }
 
     // 새 액세스 토큰 발급
@@ -105,14 +112,16 @@ router.post('/', validate(refreshTokenSchema), async (req, res) => {
 
     res.json({ accessToken });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error('토큰 갱신 중 예상치 못한 오류', {
       name: error.name,
       message: error.message,
     });
-    res.status(500).json({
-      error: '토큰 갱신 처리 중 오류가 발생했습니다.',
-      code: 'UNEXPECTED_ERROR',
-    });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

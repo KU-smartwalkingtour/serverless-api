@@ -4,6 +4,7 @@ const { findClosestCourse, findNClosestCourses } = require('@utils/course/closes
 const { getRandomCourses } = require('@utils/course/random-course');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -31,30 +32,44 @@ const { authenticateToken } = require('@middleware/auth');
  *         description: 가장 가까운 코스를 찾았습니다.
  *       400:
  *         description: 위도 또는 경도 파라미터가 누락되었거나 유효하지 않습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
  *       404:
  *         description: 코스를 찾을 수 없습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/find-closest', authenticateToken, async (req, res) => {
   try {
     const { lon, lat } = req.query;
     if (lon == null || lat == null) {
-      return res.status(400).json({ error: '경도(lon)와 위도(lat)는 필수 쿼리 파라미터입니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
     const closestCourse = await findClosestCourse(parseFloat(lat), parseFloat(lon));
-    if (closestCourse) {
-      res.json({ closestCourse });
-    } else {
-      res
-        .status(404)
-        .json({ error: '코스를 찾을 수 없거나 가장 가까운 코스를 결정할 수 없습니다.' });
+    if (!closestCourse) {
+      throw new ServerError(ERROR_CODES.COURSE_NOT_FOUND, 404);
     }
+    res.json({ closestCourse });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`가장 가까운 코스 찾기 오류: ${error.message}`);
-    res.status(500).json({ error: '가장 가까운 코스를 찾는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -90,32 +105,44 @@ router.get('/find-closest', authenticateToken, async (req, res) => {
  *         description: 가까운 N개의 코스 목록
  *       400:
  *         description: 위도, 경도 또는 개수 파라미터가 누락되었거나 유효하지 않습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
  *       404:
  *         description: 코스를 찾을 수 없습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/find-n-closest', authenticateToken, async (req, res) => {
   try {
     const { lon, lat, n } = req.query;
     if (lon == null || lat == null || n == null) {
-      return res
-        .status(400)
-        .json({ error: '경도(lon), 위도(lat), 개수(n)는 필수 쿼리 파라미터입니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
     const closestCourses = await findNClosestCourses(parseFloat(lat), parseFloat(lon), parseInt(n));
-    if (closestCourses) {
-      res.json({ closestCourses });
-    } else {
-      res
-        .status(404)
-        .json({ error: '코스를 찾을 수 없거나 가장 가까운 코스들을 결정할 수 없습니다.' });
+    if (!closestCourses) {
+      throw new ServerError(ERROR_CODES.COURSE_NOT_FOUND, 404);
     }
+    res.json({ closestCourses });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`가까운 코스들 찾기 오류: ${error.message}`);
-    res.status(500).json({ error: '가까운 코스들을 찾는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -149,10 +176,18 @@ router.get('/find-n-closest', authenticateToken, async (req, res) => {
  *                   example: ["seoultrail_1", "durunubi_123", "seoultrail_8"]
  *       400:
  *         description: n 파라미터가 누락되었거나 유효하지 않습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/find-n-random', authenticateToken, async (req, res) => {
   try {
@@ -160,14 +195,19 @@ router.get('/find-n-random', authenticateToken, async (req, res) => {
     const count = parseInt(n, 10);
 
     if (isNaN(count) || count <= 0) {
-      return res.status(400).json({ error: 'n은 0보다 큰 정수여야 합니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
 
     const randomCourses = await getRandomCourses(count);
     res.json({ randomCourses });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`랜덤 코스 조회 오류: ${error.message}`);
-    res.status(500).json({ error: '랜덤 코스를 조회하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

@@ -5,6 +5,7 @@ const { Sequelize } = require('sequelize');
 const { User, PasswordResetRequest } = require('@models');
 const { validate } = require('@utils/validation');
 const z = require('zod');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // 검증 스키마
 const verifyCodeSchema = z.object({
@@ -52,10 +53,22 @@ const verifyCodeSchema = z.object({
  *                   description: 검증 결과
  *       400:
  *         description: 유효하지 않거나 만료된 인증 코드
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: 해당 이메일로 등록된 사용자를 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/', validate(verifyCodeSchema), async (req, res) => {
   try {
@@ -65,10 +78,7 @@ router.post('/', validate(verifyCodeSchema), async (req, res) => {
     const user = await User.findOne({ where: { email } });
     if (!user) {
       logger.warn('코드 검증 실패: 사용자를 찾을 수 없음', { email });
-      return res.status(404).json({
-        error: '해당 이메일로 등록된 사용자를 찾을 수 없습니다.',
-        code: 'USER_NOT_FOUND',
-      });
+      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
     }
 
     // 인증 코드 검증
@@ -86,10 +96,7 @@ router.post('/', validate(verifyCodeSchema), async (req, res) => {
         userId: user.id,
         email,
       });
-      return res.status(400).json({
-        error: '유효하지 않거나 만료된 인증 코드입니다.',
-        code: 'INVALID_CODE',
-      });
+      throw new ServerError(ERROR_CODES.INVALID_VERIFICATION_CODE, 400);
     }
 
     logger.info('비밀번호 재설정 코드 검증 성공', {
@@ -102,14 +109,16 @@ router.post('/', validate(verifyCodeSchema), async (req, res) => {
       valid: true,
     });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error('코드 검증 중 예상치 못한 오류', {
       name: error.name,
       message: error.message,
     });
-    res.status(500).json({
-      error: '코드 검증 처리 중 오류가 발생했습니다.',
-      code: 'UNEXPECTED_ERROR',
-    });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

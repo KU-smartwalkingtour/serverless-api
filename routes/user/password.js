@@ -5,6 +5,7 @@ const { logger } = require('@utils/logger');
 const { Sequelize } = require('sequelize');
 const { User, PasswordResetRequest } = require('@models');
 const { validate, resetPasswordSchema } = require('@utils/validation');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // 상수 정의
 const BCRYPT_SALT_ROUNDS = 10;
@@ -52,8 +53,16 @@ const BCRYPT_SALT_ROUNDS = 10;
  *                   description: 성공 메시지
  *       400:
  *         description: 유효하지 않거나 만료된 인증 코드
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.patch('/', validate(resetPasswordSchema), async (req, res) => {
   try {
@@ -63,10 +72,7 @@ router.patch('/', validate(resetPasswordSchema), async (req, res) => {
     const user = await User.findOne({ where: { email } });
     if (!user) {
       logger.warn('비밀번호 재설정 실패: 사용자를 찾을 수 없음', { email });
-      return res.status(400).json({
-        error: '유효하지 않은 이메일 또는 인증 코드입니다.',
-        code: 'INVALID_CREDENTIALS',
-      });
+      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 400);
     }
 
     // 인증 코드 검증
@@ -84,10 +90,7 @@ router.patch('/', validate(resetPasswordSchema), async (req, res) => {
         userId: user.id,
         email,
       });
-      return res.status(400).json({
-        error: '유효하지 않거나 만료된 인증 코드입니다.',
-        code: 'INVALID_CODE',
-      });
+      throw new ServerError(ERROR_CODES.INVALID_PASSWORD, 400);
     }
 
     // 비밀번호 해싱 및 업데이트
@@ -104,14 +107,16 @@ router.patch('/', validate(resetPasswordSchema), async (req, res) => {
 
     res.status(200).json({ message: '비밀번호가 성공적으로 재설정되었습니다.' });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error('비밀번호 재설정 중 예상치 못한 오류', {
       name: error.name,
       message: error.message,
     });
-    res.status(500).json({
-      error: '비밀번호 재설정 처리 중 오류가 발생했습니다.',
-      code: 'UNEXPECTED_ERROR',
-    });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

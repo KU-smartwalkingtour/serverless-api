@@ -5,6 +5,7 @@ const { logger } = require('@utils/logger');
 const { User, AuthRefreshToken } = require('@models');
 const { generateTokens } = require('@utils/auth');
 const { validate, loginSchema } = require('@utils/validation');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * 사용자 정보를 안전한 형태로 변환
@@ -64,10 +65,22 @@ const sanitizeUser = (user) => ({
  *                     nickname: { type: string, description: 닉네임 }
  *       400:
  *         description: 입력값이 유효하지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 이메일 또는 비밀번호가 일치하지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/', validate(loginSchema), async (req, res) => {
   try {
@@ -77,20 +90,14 @@ router.post('/', validate(loginSchema), async (req, res) => {
     const user = await User.findOne({ where: { email, is_active: true } });
     if (!user) {
       logger.warn('로그인 실패: 사용자를 찾을 수 없음', { email });
-      return res.status(401).json({
-        error: '이메일 또는 비밀번호가 일치하지 않습니다.',
-        code: 'INVALID_CREDENTIALS',
-      });
+      throw new ServerError(ERROR_CODES.INVALID_CREDENTIALS, 401);
     }
 
     // 비밀번호 검증
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
       logger.warn('로그인 실패: 비밀번호 불일치', { userId: user.id, email });
-      return res.status(401).json({
-        error: '이메일 또는 비밀번호가 일치하지 않습니다.',
-        code: 'INVALID_CREDENTIALS',
-      });
+      throw new ServerError(ERROR_CODES.INVALID_CREDENTIALS, 401);
     }
 
     // 기존 리프레시 토큰 무효화
@@ -113,14 +120,17 @@ router.post('/', validate(loginSchema), async (req, res) => {
       user: sanitizeUser(user),
     });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error('로그인 중 예상치 못한 오류', {
       name: error.name,
       message: error.message,
     });
-    res.status(500).json({
-      error: '로그인 처리 중 오류가 발생했습니다.',
-      code: 'UNEXPECTED_ERROR',
-    });
+
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
