@@ -3,7 +3,7 @@ const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
 const { validate, updateProfileSchema } = require('@utils/validation');
-const { User, AuthRefreshToken } = require('@models');
+const { User, AuthRefreshToken, UserSavedCourse, UserRecentCourse } = require('@models');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
@@ -42,6 +42,12 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
  *                 allow_location_storage:
  *                   type: boolean
  *                   description: 위치 정보 저장 허용 여부
+ *                 saved_courses_count:
+ *                   type: integer
+ *                   description: 저장한 코스 개수
+ *                 recent_courses_count:
+ *                   type: integer
+ *                   description: 최근 본 코스 개수
  *       401:
  *         description: 인증되지 않음
  */
@@ -51,8 +57,12 @@ router.get('/profile', authenticateToken, async (req, res) => {
     if (!user) {
       throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
     }
+
+    const saved_courses_count = await UserSavedCourse.count({ where: { user_id: req.user.id } });
+    const recent_courses_count = await UserRecentCourse.count({ where: { user_id: req.user.id } });
+
     const { email, nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage } = user;
-    res.json({ email, nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage });
+    res.json({ email, nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage, saved_courses_count, recent_courses_count });
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());
