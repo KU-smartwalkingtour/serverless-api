@@ -6,7 +6,7 @@ const PasswordResetRequest = require('./passwordResetRequest');
 const UserLocation = require('./userLocation');
 const UserStat = require('./userStat');
 const UserSavedCourse = require('./userSavedCourse');
-const UserCourseHistory = require('./userCourseHistory');
+const UserRecentCourse = require('./userRecentCourse');
 const Course = require('./course');
 
 // Define all model associations
@@ -31,8 +31,8 @@ User.hasMany(UserSavedCourse, { foreignKey: 'user_id' });
 UserSavedCourse.belongsTo(User, { foreignKey: 'user_id' });
 
 // User - UserCourseHistory (1:N)
-User.hasMany(UserCourseHistory, { foreignKey: 'user_id' });
-UserCourseHistory.belongsTo(User, { foreignKey: 'user_id' });
+User.hasMany(UserRecentCourse, { foreignKey: 'user_id' });
+UserRecentCourse.belongsTo(User, { foreignKey: 'user_id' });
 
 // Export all models with associations configured
 module.exports = {
@@ -42,6 +42,6 @@ module.exports = {
   UserLocation,
   UserStat,
   UserSavedCourse,
-  UserCourseHistory,
+  UserRecentCourse,
   Course,
 };
