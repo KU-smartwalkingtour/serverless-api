@@ -1,6 +1,6 @@
 const axios = require('axios');
 const proj4 = require('proj4');
-const WeatherError = require('./error');
+const { ServerError, ERROR_CODES } = require('./error');
 const { logger } = require('./logger');
 
 // 상수
@@ -51,7 +51,9 @@ const getNxNy = async (lon, lat) => {
   const authKey = process.env.KMA_API_KEY;
 
   if (!authKey) {
-    throw new WeatherError('KMA_API_KEY environment variable is not configured', 500);
+    throw new ServerError(ERROR_CODES.KMA_API_ERROR, 500, {
+      reason: 'KMA_API_KEY environment variable is not configured',
+    });
   }
 
   try {
@@ -68,7 +70,9 @@ const getNxNy = async (lon, lat) => {
     if (typeof response.data === 'object' && response.data !== null && response.data.result) {
       const result = response.data.result;
       if (result.status !== 200) {
-        throw new WeatherError(`KMA NX/NY API Error: ${result.message}`, result.status);
+        throw new ServerError(ERROR_CODES.KMA_API_ERROR, result.status, {
+          message: `KMA NX/NY API Error: ${result.message}`,
+        });
       }
     }
 
@@ -83,13 +87,17 @@ const getNxNy = async (lon, lat) => {
         return { nx, ny };
       }
     }
-    throw new WeatherError('Invalid response format from NX/NY conversion API', 500);
+    throw new ServerError(ERROR_CODES.KMA_API_ERROR, 500, {
+      message: 'Invalid response format from NX/NY conversion API',
+    });
   } catch (error) {
-    if (WeatherError.isWeatherError(error)) {
+    if (ServerError.isServerError(error)) {
       throw error;
     }
     logger.error(`nx/ny 좌표 조회 오류: ${error.message}`);
-    throw new WeatherError(error.message || 'Error fetching nx/ny coordinates', 500);
+    throw new ServerError(ERROR_CODES.KMA_API_ERROR, 500, {
+      message: error.message || 'Error fetching nx/ny coordinates',
+    });
   }
 };
 
@@ -125,7 +133,9 @@ const getNearestStationName = async (lon, lat) => {
   const url = 'https://apis.data.go.kr/B552584/MsrstnInfoInqireSvc/getNearbyMsrstnList';
 
   if (!serviceKey) {
-    throw new WeatherError('AirKorea API key is missing. Please check your .env file.', 500);
+    throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, 500, {
+      reason: 'AirKorea API key is missing. Please check your .env file.',
+    });
   }
 
   try {
@@ -153,25 +163,27 @@ const getNearestStationName = async (lon, lat) => {
       logger.warn(
         `No nearby air quality station found for TM coords (${tmCoords.x}, ${tmCoords.y}) or invalid API response format.`,
       );
-      throw new WeatherError(
-        '가까운 측정소를 찾을 수 없거나 API 응답 형식이 올바르지 않습니다.',
-        404,
-      );
+      throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, 404, {
+        message: '가까운 측정소를 찾을 수 없거나 API 응답 형식이 올바르지 않습니다.',
+      });
     }
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      throw error;
+    }
+
     let errorMessage = 'Error fetching nearest station name';
     let statusCode = 500;
     if (error.response) {
       errorMessage = `AirKorea API Error (getNearestStationName): ${error.response.data?.response?.header?.resultMsg || error.message}`;
       statusCode = error.response.status;
-    } else if (error instanceof WeatherError) {
-      errorMessage = error.message;
-      statusCode = error.statusCode;
     } else {
       errorMessage = error.message;
     }
     logger.error(`Error fetching nearest station: ${errorMessage}`);
-    throw new WeatherError(errorMessage, statusCode);
+    throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, statusCode, {
+      message: errorMessage,
+    });
   }
 };
 
@@ -268,13 +280,17 @@ const getWeatherSummary = async (lon, lat) => {
     const response = await axios.get(baseUrl, { params });
 
     if (!response.data?.response?.header) {
-      throw new WeatherError('Invalid response format from Weather API', 500);
+      throw new ServerError(ERROR_CODES.WEATHER_API_ERROR, 500, {
+        message: 'Invalid response format from Weather API',
+      });
     }
 
     const { header, body } = response.data.response;
 
     if (header.resultCode !== '00') {
-      throw new WeatherError(`Weather API error: ${header.resultMsg}`, 400);
+      throw new ServerError(ERROR_CODES.WEATHER_API_ERROR, 400, {
+        message: `Weather API error: ${header.resultMsg}`,
+      });
     }
 
     const originalItemArray = body.items.item;
@@ -299,11 +315,13 @@ const getWeatherSummary = async (lon, lat) => {
     logger.debug(`${finalForecast.length}개의 예보 시간대 조회 완료`);
     return finalForecast;
   } catch (error) {
-    if (WeatherError.isWeatherError(error)) {
+    if (ServerError.isServerError(error)) {
       throw error;
     }
     logger.error(`날씨 요약 조회 오류: ${error.message}`);
-    throw new WeatherError('Failed to fetch weather summary', 500);
+    throw new ServerError(ERROR_CODES.WEATHER_API_ERROR, 500, {
+      message: 'Failed to fetch weather summary',
+    });
   }
 };
 
