@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { fetchNearbyFacilities } = require('@utils/medical');
-const MedicalError = require('@utils/error');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
 
@@ -41,10 +41,28 @@ const { authenticateToken } = require('@middleware/auth');
  *                 type: object
  *       '400':
  *         description: 위도와 경도는 필수 파라미터입니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '401':
  *         description: 인증되지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '403':
+ *         description: 접근 거부 (유효하지 않은 토큰)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '500':
  *         description: 병원/약국 데이터를 조회하는 중 오류가 발생했습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 
 router.get('/nearby', authenticateToken, async (req, res) => {
@@ -52,9 +70,7 @@ router.get('/nearby', authenticateToken, async (req, res) => {
     let { lon, lat } = req.query;
 
     if (!lon || !lat) {
-      return res.status(400).json({
-        error: '위도(lat)와 경도(lon)는 필수 쿼리 파라미터입니다.',
-      });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
 
     // 위도와 경도가 뒤바뀐 경우 자동 교정
@@ -68,12 +84,13 @@ router.get('/nearby', authenticateToken, async (req, res) => {
     const medicalFacilities = await fetchNearbyFacilities(lat, lon);
     res.json(medicalFacilities);
   } catch (error) {
-    if (error instanceof MedicalError) {
-      res.status(error.statusCode).json({ error: error.message });
-    } else {
-      logger.error(`병원/약국 데이터 조회 오류: ${error.message}`);
-      res.status(500).json({ error: '병원/약국 데이터를 조회하는 중 오류가 발생했습니다.' });
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
     }
+
+    logger.error(`병원/약국 데이터 조회 오류: ${error.message}`, { error: error.message });
+    const serverError = new ServerError(ERROR_CODES.MEDICAL_API_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

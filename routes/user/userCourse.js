@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
 const { UserSavedCourse, UserRecentCourse, Course } = require('@models');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -28,9 +29,17 @@ const { UserSavedCourse, UserRecentCourse, Course } = require('@models');
  *               items:
  *                 $ref: '#/components/schemas/Course'
  *       '401':
- *         description: Unauthorized.
+ *         description: 인증되지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '500':
  *         description: 서버 오류 발생
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/saved-courses', authenticateToken, async (req, res) => {
   try {
@@ -55,8 +64,9 @@ router.get('/saved-courses', authenticateToken, async (req, res) => {
 
     res.json(savedCourses);
   } catch (error) {
-    logger.error(`Error fetching saved courses for user ${req.user.id}: ${error.message}`);
-    res.status(500).json({ error: '저장된 코스 목록을 가져오는 중 오류가 발생했습니다.' });
+    logger.error(`저장된 코스 조회 오류: ${error.message}`);
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -114,8 +124,13 @@ router.put('/saved-courses/:courseId', authenticateToken, async (req, res) => {
       res.status(200).json({ message: '코스가 이미 저장되어 있습니다.', data: savedCourse });
     }
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`코스 저장 오류: ${error.message}`);
-    res.status(500).json({ error: '코스를 저장하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -166,8 +181,13 @@ router.delete('/saved-courses/:courseId', authenticateToken, async (req, res) =>
       res.status(404).json({ message: '저장 목록에서 코스를 찾을 수 없습니다.' });
     }
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`코스 삭제 오류: ${error.message}`);
-    res.status(500).json({ error: '코스를 삭제하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -188,9 +208,17 @@ router.delete('/saved-courses/:courseId', authenticateToken, async (req, res) =>
  *               items:
  *                 $ref: '#/components/schemas/UserRecentCourse'
  *       '401':
- *         description: Unauthorized.
+ *         description: 인증되지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '500':
  *         description: 서버 오류 발생
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/recent-courses', authenticateToken, async (req, res) => {
   try {
@@ -204,8 +232,9 @@ router.get('/recent-courses', authenticateToken, async (req, res) => {
 
     res.json(history);
   } catch (error) {
-    logger.error(`Error fetching course history for user ${userId}: ${error.message}`);
-    res.status(500).json({ error: '최근 본 코스 목록을 가져오는 중 오류가 발생했습니다.' });
+    logger.error(`코스 히스토리 조회 오류: ${error.message}`);
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -278,8 +307,13 @@ router.put('/recent-courses/:courseId', authenticateToken, async (req, res) => {
       res.status(201).json({ message: '코스가 성공적으로 추가되었습니다.', data: newRecentCourse });
     }
   } catch (error) {
-    logger.error(`최근 본 코스 추가 오류: ${error.message}`);
-    res.status(500).json({ error: '코스를 최근 본 목록에 추가하는 중 오류가 발생했습니다.' });
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    logger.error(`코스 히스토리 저장 오류: ${error.message}`);
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -330,8 +364,13 @@ router.delete('/recent-courses/:courseId', authenticateToken, async (req, res) =
       res.status(404).json({ message: '목록에서 코스를 찾을 수 없습니다.' });
     }
   } catch (error) {
-    logger.error(`최근 본 코스 삭제 오류: ${error.message}`);
-    res.status(500).json({ error: '코스를 최근 본 목록에서 삭제하는 중 오류가 발생했습니다.' });
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    logger.error(`코스 히스토리 삭제 오류: ${error.message}`);
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

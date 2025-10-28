@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
-const { User, UserSavedCourse, UserCourseHistory } = require('@models'); // User 모델도 여기서 가져옵니다.
+const { User, UserSavedCourse, UserCourseHistory } = require('@models');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -29,10 +30,18 @@ const { User, UserSavedCourse, UserCourseHistory } = require('@models'); // User
  *                 history_courses_count:
  *                   type: integer
  *                   description: 최근 본 코스 총 개수 (중복 포함)
- *                 '401':
- *                   description: Unauthorized.
- *                 '500':
- *                   description: 서버 오류 발생
+ *       '401':
+ *         description: 인증되지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         description: 서버 오류 발생
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -42,7 +51,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const userSettings = await User.findByPk(userId, {
       attributes: ['distance_unit'],
     });
-    const distanceUnit = userSettings ? userSettings.distance_unit : 'km'; // 사용자를 못 찾는 경우 대비
+    const distanceUnit = userSettings ? userSettings.distance_unit : 'km';
 
     // 저장된 코스 개수 세기
     const savedCount = await UserSavedCourse.count({
@@ -60,8 +69,9 @@ router.get('/', authenticateToken, async (req, res) => {
       history_courses_count: historyCount,
     });
   } catch (error) {
-    logger.error(`Error fetching user settings: ${error.message}`);
-    res.status(500).json({ error: '사용자 설정을 가져오는 중 오류가 발생했습니다.' });
+    logger.error(`사용자 설정 조회 중 오류: ${error.message}`);
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

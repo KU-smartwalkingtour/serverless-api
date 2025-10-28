@@ -4,6 +4,7 @@ const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
 const { validate, updateProfileSchema } = require('@utils/validation');
 const { User, AuthRefreshToken } = require('@models');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -92,10 +93,18 @@ router.get('/', authenticateToken, async (req, res) => {
  *                   description: 성공 메시지
  *       400:
  *         description: 입력값이 유효하지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put('/', authenticateToken, validate(updateProfileSchema), async (req, res) => {
   try {
@@ -109,7 +118,7 @@ router.put('/', authenticateToken, validate(updateProfileSchema), async (req, re
     if (distance_unit !== undefined) updates.distance_unit = distance_unit;
 
     if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ error: '업데이트할 필드가 제공되지 않았습니다.' });
+      throw new ServerError(ERROR_CODES.NO_FIELDS_TO_UPDATE, 400);
     }
 
     await user.update(updates);
@@ -117,8 +126,13 @@ router.put('/', authenticateToken, validate(updateProfileSchema), async (req, re
     logger.info(`사용자 프로필 업데이트: ${user.email}`);
     res.status(200).json({ message: '프로필이 성공적으로 업데이트되었습니다.' });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`사용자 프로필 업데이트 중 오류 발생: ${error.message}`);
-    res.status(500).json({ error: '프로필 업데이트 처리 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -136,8 +150,16 @@ router.put('/', authenticateToken, validate(updateProfileSchema), async (req, re
  *         description: Unauthorized.
  *       '404':
  *         description: 사용자를 찾을 수 없습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '500':
  *         description: 서버 오류 발생
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.delete('/', authenticateToken, async (req, res) => {
   try {
@@ -146,7 +168,7 @@ router.delete('/', authenticateToken, async (req, res) => {
     if (!user || typeof user.destroy !== 'function') {
       const userInstance = await User.findByPk(req.user.id);
       if (!userInstance) {
-        return res.status(404).json({ error: 'User not found.' });
+        throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
       }
       await userInstance.destroy(); // Soft delete 실행
     } else {
@@ -162,8 +184,13 @@ router.delete('/', authenticateToken, async (req, res) => {
     logger.info(`User soft deleted: ${req.user.email}`);
     res.status(200).json({ message: '회원탈퇴 처리가 완료되었습니다.' });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`Error deleting user: ${error.message}`);
-    res.status(500).json({ error: '회원탈퇴 처리 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

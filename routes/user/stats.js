@@ -4,6 +4,7 @@ const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
 const { UserStat } = require('@models');
 const { validate, logWalkSchema } = require('@utils/validation');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger

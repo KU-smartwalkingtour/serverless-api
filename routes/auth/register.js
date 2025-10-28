@@ -5,6 +5,7 @@ const { logger } = require('@utils/logger');
 const { User } = require('@models');
 const { generateTokens } = require('@utils/auth');
 const { validate, registerSchema } = require('@utils/validation');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // 상수 정의
 const BCRYPT_SALT_ROUNDS = 10;
@@ -74,10 +75,22 @@ const sanitizeUser = (user) => ({
  *                     nickname: { type: string, description: 닉네임 }
  *       400:
  *         description: 입력값이 유효하지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
  *         description: 이미 존재하는 이메일
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/', validate(registerSchema), async (req, res) => {
   try {
@@ -87,10 +100,7 @@ router.post('/', validate(registerSchema), async (req, res) => {
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       logger.warn('회원가입 실패: 이메일 중복', { email });
-      return res.status(409).json({
-        error: '이미 존재하는 이메일입니다.',
-        code: 'EMAIL_ALREADY_EXISTS',
-      });
+      throw new ServerError(ERROR_CODES.EMAIL_ALREADY_EXISTS, 409);
     }
 
     // 비밀번호 해싱
@@ -117,14 +127,17 @@ router.post('/', validate(registerSchema), async (req, res) => {
       user: sanitizeUser(newUser),
     });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error('회원가입 중 예상치 못한 오류', {
       name: error.name,
       message: error.message,
     });
-    res.status(500).json({
-      error: '회원가입 처리 중 오류가 발생했습니다.',
-      code: 'UNEXPECTED_ERROR',
-    });
+
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

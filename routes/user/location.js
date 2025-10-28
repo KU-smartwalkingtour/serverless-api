@@ -4,6 +4,7 @@ const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
 const { UserLocation } = require('@models');
 const { validate, updateLocationSchema } = require('@utils/validation');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -44,10 +45,18 @@ const { validate, updateLocationSchema } = require('@utils/validation');
  *                   description: 성공 메시지
  *       '400':
  *         description: 입력값이 유효하지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '401':
  *         description: 인증되지 않음
  *       '500':
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put('/', authenticateToken, validate(updateLocationSchema), async (req, res) => {
   try {
@@ -62,8 +71,13 @@ router.put('/', authenticateToken, validate(updateLocationSchema), async (req, r
 
     res.status(200).json({ message: '위치가 성공적으로 업데이트되었습니다.' });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`사용자 위치 업데이트 중 오류 발생: ${error.message}`);
-    res.status(500).json({ error: '위치 업데이트 처리 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

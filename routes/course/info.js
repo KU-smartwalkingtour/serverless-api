@@ -5,6 +5,7 @@ const { getCourseMetadata } = require('@utils/course/course-metadata');
 const { getProviderFromCourseId, logCourseView } = require('@utils/course/course-helpers');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
@@ -26,22 +27,34 @@ const { authenticateToken } = require('@middleware/auth');
  *         description: 코스 메타데이터
  *       400:
  *         description: courseId 파라미터가 누락되었습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
  *       404:
  *         description: 코스 파일을 찾을 수 없습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/metadata', authenticateToken, async (req, res) => {
   try {
     const { courseId } = req.query;
     if (!courseId) {
-      return res.status(400).json({ error: 'courseId는 필수 쿼리 파라미터입니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
     const metadata = await getCourseMetadata(courseId);
     if (!metadata) {
-      return res.status(404).json({ error: '코스를 찾을 수 없습니다.' });
+      throw new ServerError(ERROR_CODES.COURSE_NOT_FOUND, 404);
     }
     res.json(metadata);
 
@@ -49,8 +62,13 @@ router.get('/metadata', authenticateToken, async (req, res) => {
     const provider = getProviderFromCourseId(courseId);
     logCourseView(req.user.id, courseId, provider);
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`코스 메타데이터 조회 오류: ${error.message}`);
-    res.status(500).json({ error: '코스 메타데이터를 조회하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -74,22 +92,34 @@ router.get('/metadata', authenticateToken, async (req, res) => {
  *         description: 코스 경로의 좌표 배열
  *       400:
  *         description: courseId 파라미터가 누락되었습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
  *       404:
  *         description: 코스 파일을 찾을 수 없습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/coordinates', authenticateToken, async (req, res) => {
   try {
     const { courseId } = req.query;
     if (!courseId) {
-      return res.status(400).json({ error: 'courseId는 필수 쿼리 파라미터입니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
     const coordinates = await getCourseCoordinates(courseId);
     if (!coordinates) {
-      return res.status(404).json({ error: '코스 파일을 찾을 수 없거나 좌표를 읽을 수 없습니다.' });
+      throw new ServerError(ERROR_CODES.COURSE_NOT_FOUND, 404);
     }
     res.json(coordinates);
 
@@ -97,8 +127,13 @@ router.get('/coordinates', authenticateToken, async (req, res) => {
     const provider = getProviderFromCourseId(courseId);
     logCourseView(req.user.id, courseId, provider);
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`코스 좌표 조회 오류: ${error.message}`);
-    res.status(500).json({ error: '코스 좌표를 조회하는 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

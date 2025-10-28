@@ -32,7 +32,40 @@ const swaggerOptions = {
         },
       },
       schemas: {
-        User: {
+        ErrorResponse: {
+          type: 'object',
+          properties: {
+            error: {
+              type: 'object',
+              properties: {
+                code: {
+                  type: 'string',
+                  description: '에러 코드',
+                  example: 'INVALID_INPUT',
+                },
+                message: {
+                  type: 'string',
+                  description: '한글 에러 메시지',
+                  example: '입력값이 유효하지 않습니다.',
+                },
+                details: {
+                  type: 'object',
+                  description: '추가 에러 정보 (선택사항)',
+                  example: { field: 'email', reason: 'invalid format' },
+                },
+              },
+              required: ['code', 'message'],
+            },
+            timestamp: {
+              type: 'string',
+              format: 'date-time',
+              description: '에러 발생 시각',
+              example: '2024-01-15T10:30:00.000Z',
+            },
+          },
+          required: ['error', 'timestamp'],
+        },
+        UserSavedCourse: {
           type: 'object',
           properties: {
             id: {
