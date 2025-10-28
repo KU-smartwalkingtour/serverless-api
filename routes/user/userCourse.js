@@ -103,12 +103,12 @@ router.put('/saved-courses/:courseId', authenticateToken, async (req, res) => {
   try {
     const { courseId } = req.params;
     if (!courseId) {
-      return res.status(400).json({ error: 'courseId는 필수입니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_INPUT, 400, 'courseId는 필수입니다.');
     }
 
     const course = await Course.findByPk(courseId.toString());
     if (!course) {
-      return res.status(404).json({ error: '해당 코스를 찾을 수 없습니다.' });
+      throw new ServerError(ERROR_CODES.COURSE_NOT_FOUND, 404);
     }
 
     const [savedCourse, created] = await UserSavedCourse.findOrCreate({
@@ -165,7 +165,7 @@ router.delete('/saved-courses/:courseId', authenticateToken, async (req, res) =>
   try {
     const { courseId } = req.params;
     if (!courseId) {
-      return res.status(400).json({ error: 'courseId는 필수입니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_INPUT, 400, 'courseId는 필수입니다.');
     }
 
     const deletedCount = await UserSavedCourse.destroy({
@@ -178,7 +178,7 @@ router.delete('/saved-courses/:courseId', authenticateToken, async (req, res) =>
     if (deletedCount > 0) {
       res.status(200).json({ message: '코스가 성공적으로 삭제되었습니다.' });
     } else {
-      res.status(404).json({ message: '저장 목록에서 코스를 찾을 수 없습니다.' });
+      throw new ServerError(ERROR_CODES.RESOURCE_NOT_FOUND, 404, '저장 목록에서 코스를 찾을 수 없습니다.');
     }
   } catch (error) {
     if (ServerError.isServerError(error)) {
@@ -271,12 +271,12 @@ router.put('/recent-courses/:courseId', authenticateToken, async (req, res) => {
   try {
     const { courseId } = req.params;
     if (!courseId) {
-      return res.status(400).json({ error: 'courseId는 필수 파라미터입니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_INPUT, 400, 'courseId는 필수 파라미터입니다.');
     }
 
     const course = await Course.findByPk(courseId.toString());
     if (!course) {
-      return res.status(404).json({ error: '해당 코스를 찾을 수 없습니다.' });
+      throw new ServerError(ERROR_CODES.COURSE_NOT_FOUND, 404);
     }
 
     const userId = req.user.id;
@@ -348,7 +348,7 @@ router.delete('/recent-courses/:courseId', authenticateToken, async (req, res) =
   try {
     const { courseId } = req.params;
     if (!courseId) {
-      return res.status(400).json({ error: 'courseId는 필수 파라미터입니다.' });
+      throw new ServerError(ERROR_CODES.INVALID_INPUT, 400, 'courseId는 필수 파라미터입니다.');
     }
 
     const deletedCount = await UserRecentCourse.destroy({
@@ -361,7 +361,7 @@ router.delete('/recent-courses/:courseId', authenticateToken, async (req, res) =
     if (deletedCount > 0) {
       res.status(200).json({ message: '코스가 성공적으로 삭제되었습니다.' });
     } else {
-      res.status(404).json({ message: '목록에서 코스를 찾을 수 없습니다.' });
+      throw new ServerError(ERROR_CODES.RESOURCE_NOT_FOUND, 404, '목록에서 코스를 찾을 수 없습니다.');
     }
   } catch (error) {
     if (ServerError.isServerError(error)) {
