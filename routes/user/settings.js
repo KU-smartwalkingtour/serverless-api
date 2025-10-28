@@ -2,74 +2,99 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
-const { User, UserSavedCourse, UserCourseHistory } = require('@models');
+const { User } = require('@models');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
  * /user/settings:
- *   get:
- *     summary: 사용자 설정 화면 조회 (거리단위, 저장된 코스 개수, 최근 본 코스 개수)
+ *   patch:
+ *     summary: 사용자 설정 업데이트
+ *     description: 인증된 사용자의 설정을 업데이트합니다.
  *     tags: [User]
  *     security: [ { bearerAuth: [] } ]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nickname:
+ *                 type: string
+ *                 description: 닉네임
+ *               language:
+ *                 type: string
+ *                 description: 언어
+ *               distance_unit:
+ *                 type: string
+ *                 enum: [km, mi]
+ *                 description: 거리 단위
+ *               is_dark_mode_enabled:
+ *                 type: boolean
+ *                 description: 다크 모드 활성화 여부
+ *               allow_location_storage:
+ *                 type: boolean
+ *                 description: 위치 정보 저장 허용 여부
  *     responses:
- *       '200':
- *         description: 사용자 설정 및 코스 개수 정보
+ *       200:
+ *         description: 설정이 성공적으로 업데이트되었습니다.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
+ *                 nickname:
+ *                   type: string
+ *                   description: 닉네임
  *                 distance_unit:
  *                   type: string
  *                   enum: [km, mi]
- *                   description: 사용자가 설정한 거리 단위
- *                 saved_courses_count:
- *                   type: integer
- *                   description: 저장된 코스 총 개수
- *                 history_courses_count:
- *                   type: integer
- *                   description: 최근 본 코스 총 개수 (중복 포함)
- *       '401':
+ *                   description: 거리 단위
+ *                 is_dark_mode_enabled:
+ *                   type: boolean
+ *                   description: 다크 모드 활성화 여부
+ *                 language:
+ *                   type: string
+ *                   description: 언어
+ *                 allow_location_storage:
+ *                   type: boolean
+ *                   description: 위치 정보 저장 허용 여부
+ *       400:
+ *         description: 입력값이 유효하지 않음
+ *       401:
  *         description: 인증되지 않음
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       '500':
- *         description: 서버 오류 발생
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: 서버 오류
  */
-router.get('/', authenticateToken, async (req, res) => {
+router.patch('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const { nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage } = req.body;
+    const user = req.user;
 
-    // 사용자 설정 가져오기 (DB에서 직접 조회하여 최신 정보 보장)
-    const userSettings = await User.findByPk(userId, {
-      attributes: ['distance_unit'],
-    });
-    const distanceUnit = userSettings ? userSettings.distance_unit : 'km';
+    // 업데이트할 필드 수집
+    const updates = {};
+    if (nickname !== undefined) updates.nickname = nickname;
+    if (language !== undefined) updates.language = language;
+    if (distance_unit !== undefined) updates.distance_unit = distance_unit;
+    if (is_dark_mode_enabled !== undefined) updates.is_dark_mode_enabled = is_dark_mode_enabled;
+    if (allow_location_storage !== undefined) updates.allow_location_storage = allow_location_storage;
 
-    // 저장된 코스 개수 세기
-    const savedCount = await UserSavedCourse.count({
-      where: { user_id: userId },
-    });
+    if (Object.keys(updates).length === 0) {
+      throw new ServerError(ERROR_CODES.NO_FIELDS_TO_UPDATE, 400);
+    }
 
-    // 최근 본 코스 개수 세기
-    const historyCount = await UserCourseHistory.count({
-      where: { user_id: userId },
-    });
+    await user.update(updates);
+    await user.reload();
 
-    res.json({
-      distance_unit: distanceUnit,
-      saved_courses_count: savedCount,
-      history_courses_count: historyCount,
-    });
+    logger.info(`사용자 설정 업데이트: ${user.email}`);
+    res.status(200).json({ nickname: user.nickname, language: user.language, distance_unit: user.distance_unit, is_dark_mode_enabled: user.is_dark_mode_enabled, allow_location_storage: user.allow_location_storage });
   } catch (error) {
-    logger.error(`사용자 설정 조회 중 오류: ${error.message}`);
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
+    logger.error(`사용자 설정 업데이트 중 오류 발생: ${error.message}`);
     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
     res.status(500).json(serverError.toJSON());
   }
