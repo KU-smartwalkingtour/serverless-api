@@ -1,4 +1,4 @@
-const { UserCourseHistory } = require('@models');
+const { UserRecentCourse } = require('@models');
 const { logger } = require('@utils/logger');
 
 /**
@@ -18,13 +18,13 @@ const getProviderFromCourseId = (courseId) => {
  */
 const logCourseView = async (userId, courseId, provider) => {
   try {
-    await UserCourseHistory.create({
+    await UserRecentCourse.create({
       user_id: userId,
       provider: provider,
-      provider_course_id: courseId.toString(),
+      course_id: courseId.toString(),
     });
   } catch (error) {
-    logger.error(`코스 히스토리 기록 실패 - 사용자 ${userId}, 코스 ${courseId}: ${error.message}`);
+    logger.error(`코스 히스토리 기록 실패 - 사용자 ${userId}, 코스 ${courseId}, provider: ${provider}: ${error.message}`);
   }
 };
 
