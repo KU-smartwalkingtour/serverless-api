@@ -174,5 +174,5 @@ esbuild
       log.error('빌드 실패');
       console.error(error);
       process.exit(1);
-    }
+    },
   );
