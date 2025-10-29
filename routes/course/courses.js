@@ -8,7 +8,7 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
- * /course/courses:
+ * /courses:
  *   get:
  *     summary: 코스 탭에서 코스 목록 조회 (정렬 및 난이도 필터링)
  *     description: 현재 위치를 기준으로 N개의 코스를 조회하며, 정렬 기준과 난이도 필터링을 적용할 수 있습니다.

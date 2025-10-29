@@ -111,11 +111,30 @@ const getGpxContentFromS3 = async (courseId) => {
  * @returns {Promise<Array<{lat: number, lon: number}>|null>} 좌표 배열 또는 파일을 찾지 못하면 null
  */
 const getCourseCoordinates = async (courseId) => {
-  const gpxContent = await getGpxContentFromS3(courseId);
-  if (!gpxContent) {
-    return null; // GPX 파일을 찾을 수 없음
+  try {
+    logger.info(`getCourseCoordinates 시작: courseId=${courseId}`);
+
+    const gpxContent = await getGpxContentFromS3(courseId);
+    if (!gpxContent) {
+      logger.warn(`S3에서 GPX 파일을 찾을 수 없음: courseId=${courseId}`);
+      return null; // GPX 파일을 찾을 수 없음
+    }
+
+    logger.info(`S3에서 GPX 파일 조회 성공: courseId=${courseId}, 크기=${gpxContent.length}바이트`);
+
+    const coordinates = await getCoordinatesFromGpx(gpxContent);
+    logger.info(`GPX 파싱 성공: courseId=${courseId}, 좌표 개수=${coordinates.length}`);
+
+    return coordinates;
+  } catch (error) {
+    logger.error(`getCourseCoordinates 실패: courseId=${courseId}, 에러=${error.message}`, {
+      courseId,
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack,
+    });
+    throw error; // 에러를 상위로 전파
   }
-  return await getCoordinatesFromGpx(gpxContent);
 };
 
 module.exports = {

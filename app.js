@@ -49,7 +49,7 @@ app.get('/health', (req, res) => {
 // Register routes
 app.use('/auth', authRouter);
 app.use('/weather', weatherRouter);
-app.use('/course', courseRouter);
+app.use('/courses', courseRouter);
 app.use('/user', userRouter);
 app.use('/medical', medicalRouter);
 
