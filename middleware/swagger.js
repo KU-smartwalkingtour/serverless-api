@@ -70,211 +70,211 @@ const swaggerOptions = {
           properties: {
             id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             email: {
-              type: 'string'
+              type: 'string',
             },
             nickname: {
-              type: 'string'
+              type: 'string',
             },
             language: {
               type: 'string',
-              default: 'ko'
+              default: 'ko',
             },
             distance_unit: {
               type: 'string',
               enum: ['km', 'mi'],
-              default: 'km'
+              default: 'km',
             },
             is_active: {
               type: 'boolean',
-              default: true
+              default: true,
             },
             created_at: {
               type: 'string',
-              format: 'date-time'
+              format: 'date-time',
             },
             updated_at: {
               type: 'string',
-              format: 'date-time'
-            }
-          }
+              format: 'date-time',
+            },
+          },
         },
         AuthRefreshToken: {
           type: 'object',
           properties: {
             id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             user_id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             token_hash: {
-              type: 'string'
+              type: 'string',
             },
             expires_at: {
               type: 'string',
-              format: 'date-time'
+              format: 'date-time',
             },
             revoked_at: {
               type: 'string',
-              format: 'date-time'
+              format: 'date-time',
             },
             created_at: {
               type: 'string',
-              format: 'date-time'
-            }
-          }
+              format: 'date-time',
+            },
+          },
         },
         PasswordResetRequest: {
           type: 'object',
           properties: {
             id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             user_id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             code: {
-              type: 'string'
+              type: 'string',
             },
             expires_at: {
               type: 'string',
-              format: 'date-time'
+              format: 'date-time',
             },
             verified_at: {
               type: 'string',
-              format: 'date-time'
+              format: 'date-time',
             },
             consumed: {
               type: 'boolean',
-              default: false
+              default: false,
             },
             created_at: {
               type: 'string',
-              format: 'date-time'
-            }
-          }
+              format: 'date-time',
+            },
+          },
         },
         UserLocation: {
           type: 'object',
           properties: {
             user_id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             latitude: {
               type: 'number',
-              format: 'decimal'
+              format: 'decimal',
             },
             longitude: {
               type: 'number',
-              format: 'decimal'
+              format: 'decimal',
             },
             updated_at: {
               type: 'string',
-              format: 'date-time'
-            }
-          }
+              format: 'date-time',
+            },
+          },
         },
         UserStat: {
           type: 'object',
           properties: {
             user_id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             total_walk_distance_km: {
               type: 'number',
-              format: 'decimal'
+              format: 'decimal',
             },
             updated_at: {
               type: 'string',
-              format: 'date-time'
-            }
-          }
+              format: 'date-time',
+            },
+          },
         },
         Course: {
           type: 'object',
           properties: {
             course_id: {
-              type: 'string'
+              type: 'string',
             },
             course_name: {
-              type: 'string'
+              type: 'string',
             },
             course_type: {
               type: 'string',
-              enum: ['seoul_trail', 'durunubi']
+              enum: ['seoul_trail', 'durunubi'],
             },
             course_length: {
               type: 'number',
-              format: 'decimal'
+              format: 'decimal',
             },
             course_duration: {
-              type: 'integer'
+              type: 'integer',
             },
             course_difficulty: {
               type: 'string',
-              enum: ['하', '중', '상']
+              enum: ['하', '중', '상'],
             },
             course_description: {
-              type: 'string'
+              type: 'string',
             },
             location: {
-              type: 'string'
+              type: 'string',
             },
             start_lat: {
               type: 'number',
-              format: 'decimal'
+              format: 'decimal',
             },
             start_lon: {
               type: 'number',
-              format: 'decimal'
-            }
-          }
+              format: 'decimal',
+            },
+          },
         },
         UserSavedCourse: {
           type: 'object',
           properties: {
             user_id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             course_id: {
-              type: 'string'
+              type: 'string',
             },
             saved_at: {
               type: 'string',
-              format: 'date-time'
-            }
-          }
+              format: 'date-time',
+            },
+          },
         },
         UserRecentCourse: {
           type: 'object',
           properties: {
             user_id: {
               type: 'string',
-              format: 'uuid'
+              format: 'uuid',
             },
             course_id: {
-              type: 'string'
+              type: 'string',
             },
             viewed_at: {
               type: 'string',
-              format: 'date-time'
+              format: 'date-time',
             },
             updated_at: {
               type: 'string',
-              format: 'date-time'
-            }
-          }
-        }
+              format: 'date-time',
+            },
+          },
+        },
       },
     },
     security: [

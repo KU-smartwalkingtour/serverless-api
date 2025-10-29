@@ -1,8 +1,8 @@
-const { SESv2Client, SendEmailCommand } = require("@aws-sdk/client-sesv2");
+const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
 
 // 1) SES 클라이언트 생성
 const sesClient = new SESv2Client({
-  region: "ap-northeast-2"
+  region: 'ap-northeast-2',
 });
 
 /**
@@ -114,14 +114,14 @@ async function sendPasswordResetEmail({ toEmail, code }) {
   `.trim();
 
   const command = new SendEmailCommand({
-    FromEmailAddress: "no-reply@ku-smartwalkingtour.site",
+    FromEmailAddress: 'no-reply@ku-smartwalkingtour.site',
     Destination: {
       ToAddresses: [toEmail],
     },
     Content: {
       Simple: {
         Subject: {
-          Data: "🔐 [KU 둘레길] 비밀번호 재설정 인증코드",
+          Data: '🔐 [KU 둘레길] 비밀번호 재설정 인증코드',
         },
         Body: {
           Html: {

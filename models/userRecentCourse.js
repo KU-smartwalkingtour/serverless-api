@@ -5,7 +5,6 @@ class UserRecentCourse extends Model {}
 
 UserRecentCourse.init(
   {
-    
     user_id: {
       type: DataTypes.UUID,
       allowNull: false,
