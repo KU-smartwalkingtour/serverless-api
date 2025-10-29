@@ -34,8 +34,13 @@ router.get('/', authenticateToken, async (req, res) => {
     });
     res.json(stats);
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`사용자 통계 조회 중 오류 발생: ${error.message}`);
-    res.status(500).json({ error: '통계 조회 처리 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 
@@ -100,8 +105,13 @@ router.post('/walk', authenticateToken, validate(logWalkSchema), async (req, res
       .status(200)
       .json({ message: '걷기 거리가 성공적으로 기록되었습니다.', new_total: newTotal });
   } catch (error) {
+    if (ServerError.isServerError(error)) {
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+
     logger.error(`걷기 거리 기록 중 오류 발생: ${error.message}`);
-    res.status(500).json({ error: '걷기 거리 기록 처리 중 오류가 발생했습니다.' });
+    const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    res.status(500).json(serverError.toJSON());
   }
 });
 

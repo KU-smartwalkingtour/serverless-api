@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { logger } = require('@utils/logger');
 const { User } = require('@models');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * Authorization 헤더에서 Bearer 토큰 추출
@@ -29,14 +30,14 @@ const extractToken = (headers) => {
  * @returns {void}
  */
 const authenticateToken = async (req, res, next) => {
-  const token = extractToken(req.headers);
-
-  // 토큰 없음
-  if (!token) {
-    return res.status(401).json({ error: '인증 토큰이 필요합니다.' });
-  }
-
   try {
+    const token = extractToken(req.headers);
+
+    // 토큰 없음
+    if (!token) {
+      throw new ServerError(ERROR_CODES.UNAUTHORIZED, 401);
+    }
+
     // JWT 토큰 검증
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
@@ -50,20 +51,26 @@ const authenticateToken = async (req, res, next) => {
         userId: decoded.id,
         path: req.path,
       });
-      return res.status(403).json({ error: '접근 권한이 없습니다.', code: 'FORBIDDEN_USER' });
+      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 403);
     }
 
     // 인증 성공: 사용자 객체를 요청에 첨부
     req.user = user;
     next();
   } catch (err) {
+    // ServerError인 경우 그대로 전달
+    if (ServerError.isServerError(err)) {
+      return res.status(err.statusCode).json(err.toJSON());
+    }
+
     // JWT 에러 타입별 처리
     if (err.name === 'TokenExpiredError') {
       logger.warn('JWT 토큰 만료', {
         expiredAt: err.expiredAt,
         path: req.path,
       });
-      return res.status(401).json({ error: '토큰이 만료되었습니다.', code: 'TOKEN_EXPIRED' });
+      const error = new ServerError(ERROR_CODES.TOKEN_EXPIRED, 401);
+      return res.status(error.statusCode).json(error.toJSON());
     }
 
     if (err.name === 'JsonWebTokenError') {
@@ -71,7 +78,8 @@ const authenticateToken = async (req, res, next) => {
         message: err.message,
         path: req.path,
       });
-      return res.status(401).json({ error: '유효하지 않은 토큰입니다.', code: 'INVALID_TOKEN' });
+      const error = new ServerError(ERROR_CODES.INVALID_TOKEN, 401);
+      return res.status(error.statusCode).json(error.toJSON());
     }
 
     // 기타 에러
@@ -80,9 +88,8 @@ const authenticateToken = async (req, res, next) => {
       message: err.message,
       path: req.path,
     });
-    return res
-      .status(500)
-      .json({ error: '인증 처리 중 오류가 발생했습니다.', code: 'UNEXPECTED_ERROR' });
+    const error = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    return res.status(error.statusCode).json(error.toJSON());
   }
 };
 

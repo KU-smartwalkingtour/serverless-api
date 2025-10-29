@@ -3,6 +3,7 @@ const cookieParser = require('cookie-parser');
 const swaggerUi = require('swagger-ui-express');
 
 const { logger } = require('@utils/logger');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 const swaggerSpec = require('@middleware/swagger');
 
 // Import routers
@@ -54,16 +55,35 @@ app.use('/medical', medicalRouter);
 
 // 404 핸들러
 app.use((req, res) => {
-  res.status(404).json({ error: '요청한 경로를 찾을 수 없습니다.', path: req.path });
+  const error = new ServerError(ERROR_CODES.RESOURCE_NOT_FOUND, 404, { path: req.path });
+  res.status(error.statusCode).json(error.toJSON());
 });
 
-// 에러 핸들러
+// 글로벌 에러 핸들러
 app.use((err, req, res, next) => {
-  logger.error(`오류 발생: ${err.message}`, { stack: err.stack });
-  res.status(err.status || 500).json({
-    error: err.message || '내부 서버 오류가 발생했습니다.',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  // ServerError인 경우 그대로 반환
+  if (ServerError.isServerError(err)) {
+    logger.error(`ServerError 발생: ${err.code}`, {
+      message: err.message,
+      statusCode: err.statusCode,
+      path: req.path,
+    });
+    return res.status(err.statusCode).json(err.toJSON());
+  }
+
+  // 일반 에러인 경우
+  logger.error(`예상치 못한 오류 발생: ${err.message}`, {
+    stack: err.stack,
+    path: req.path,
   });
+
+  const serverError = new ServerError(
+    ERROR_CODES.INTERNAL_SERVER_ERROR,
+    err.status || 500,
+    process.env.NODE_ENV === 'development' ? { originalError: err.message, stack: err.stack } : {},
+  );
+
+  res.status(serverError.statusCode).json(serverError.toJSON());
 });
 
 module.exports = app;
