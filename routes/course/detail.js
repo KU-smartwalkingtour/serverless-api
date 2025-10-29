@@ -61,7 +61,43 @@ router.get('/:courseId', authenticateToken, async (req, res) => {
       throw new ServerError(ERROR_CODES.COURSE_NOT_FOUND, 404);
     }
 
-    res.json(metadata);
+    const responseData = metadata.toJSON(); // Convert Sequelize instance to plain object
+
+    if (responseData.MedicalFacility) {
+      const facility = responseData.MedicalFacility;
+      const medicalFacilityInfo = {
+        name: facility.name,
+        address: facility.address,
+        tel_main: facility.tel_main,
+        emergency_room_open: facility.emergency_room_open === '1' ? true : (facility.emergency_room_open === '2' ? false : null),
+        tel_emergency: facility.tel_emergency,
+        operating_hours: {
+          mon_start: facility.time_mon_start,
+          mon_end: facility.time_mon_end,
+          tue_start: facility.time_tue_start,
+          tue_end: facility.time_tue_end,
+          wed_start: facility.time_wed_start,
+          wed_end: facility.time_wed_end,
+          thu_start: facility.time_thu_start,
+          thu_end: facility.time_thu_end,
+          fri_start: facility.time_fri_start,
+          fri_end: facility.time_fri_end,
+          sat_start: facility.time_sat_start,
+          sat_end: facility.time_sat_end,
+          sun_start: facility.time_sun_start,
+          sun_end: facility.time_sun_end,
+          hol_start: facility.time_hol_start,
+          hol_end: facility.time_hol_end,
+        },
+        distance_from_course_km: responseData.distance_to_closest_medical_facility_km,
+      };
+      responseData.medical_facility_info = medicalFacilityInfo;
+      delete responseData.MedicalFacility; // Remove the raw MedicalFacility object
+      delete responseData.closest_medical_facility_hpid; // Remove the foreign key
+      delete responseData.distance_to_closest_medical_facility_km; // Remove the raw distance
+    }
+
+    res.json(responseData);
 
     // 비동기로 코스 조회 기록 (응답 후 실행)
     const provider = getProviderFromCourseId(courseId);

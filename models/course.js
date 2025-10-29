@@ -38,6 +38,18 @@ Course.init(
     start_lon: {
       type: DataTypes.DECIMAL(9, 6),
     },
+    closest_medical_facility_hpid: {
+      type: DataTypes.STRING(10),
+      references: {
+        model: 'medical_facilities',
+        key: 'hpid',
+      },
+      onUpdate: 'CASCADE',
+      onDelete: 'SET NULL',
+    },
+    distance_to_closest_medical_facility_km: {
+      type: DataTypes.DOUBLE,
+    },
   },
   {
     sequelize,

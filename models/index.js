@@ -8,6 +8,7 @@ const UserStat = require('./userStat');
 const UserSavedCourse = require('./userSavedCourse');
 const UserRecentCourse = require('./userRecentCourse');
 const Course = require('./course');
+const MedicalFacility = require('./medicalFacility');
 
 // Define all model associations
 // User - AuthRefreshToken (1:N)
@@ -34,6 +35,8 @@ UserSavedCourse.belongsTo(User, { foreignKey: 'user_id' });
 User.hasMany(UserRecentCourse, { foreignKey: 'user_id' });
 UserRecentCourse.belongsTo(User, { foreignKey: 'user_id' });
 
+Course.belongsTo(MedicalFacility, { foreignKey: 'closest_medical_facility_hpid', targetKey: 'hpid' });
+
 // Export all models with associations configured
 module.exports = {
   User,
@@ -44,4 +47,5 @@ module.exports = {
   UserSavedCourse,
   UserRecentCourse,
   Course,
+  MedicalFacility,
 };
