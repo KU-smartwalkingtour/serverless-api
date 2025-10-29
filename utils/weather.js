@@ -122,137 +122,6 @@ const convertWGS84toTM = (lon, lat) => {
 };
 
 /**
- * [신규] 위도, 경도를 기반으로 'getNearbyMsrstnList' API를 호출하여
- * 가장 가까운 대기 질 측정소 이름을 반환합니다.
- * @param {string} lon - 경도 (WGS84)
- * @param {string} lat - 위도 (WGS84)
- * @returns {Promise<string>} 가장 가까운 측정소 이름
- */
-const getNearestStationName = async (lon, lat) => {
-  const serviceKey = process.env.AIRKOREA_API_KEY;
-  const url = 'https://apis.data.go.kr/B552584/MsrstnInfoInqireSvc/getNearbyMsrstnList';
-
-  if (!serviceKey) {
-    throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, 500, {
-      reason: 'AirKorea API key is missing. Please check your .env file.',
-    });
-  }
-
-  try {
-    // 1. WGS84 좌표를 TM 좌표로 변환
-    const tmCoords = convertWGS84toTM(parseFloat(lon), parseFloat(lat));
-
-    // 2. 변환된 TM 좌표로 API 호출
-    const response = await axios.get(url, {
-      params: {
-        serviceKey: serviceKey,
-        returnType: 'json',
-        tmX: tmCoords.x, // TM 좌표 사용
-        tmY: tmCoords.y, // TM 좌표 사용
-        ver: '1.1', // API 문서에 명시된 버전 사용
-      },
-    });
-
-    // 3. 응답 처리
-    if (response.data?.response?.body?.items && response.data.response.body.items.length > 0) {
-      const nearestStation = response.data.response.body.items[0];
-      const stationName = nearestStation.stationName;
-      logger.debug(`Found nearest air quality station: ${stationName}`);
-      return stationName;
-    } else {
-      logger.warn(
-        `No nearby air quality station found for TM coords (${tmCoords.x}, ${tmCoords.y}) or invalid API response format.`,
-      );
-      throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, 404, {
-        message: '가까운 측정소를 찾을 수 없거나 API 응답 형식이 올바르지 않습니다.',
-      });
-    }
-  } catch (error) {
-    if (ServerError.isServerError(error)) {
-      throw error;
-    }
-
-    let errorMessage = 'Error fetching nearest station name';
-    let statusCode = 500;
-    if (error.response) {
-      errorMessage = `AirKorea API Error (getNearestStationName): ${error.response.data?.response?.header?.resultMsg || error.message}`;
-      statusCode = error.response.status;
-    } else {
-      errorMessage = error.message;
-    }
-    logger.error(`Error fetching nearest station: ${errorMessage}`);
-    throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, statusCode, {
-      message: errorMessage,
-    });
-  }
-};
-
-/**
- * 특정 측정소 이름으로 실시간 대기 질 정보를 가져옵니다.
- * @param {string} stationName - 대기 질 정보를 조회할 측정소 이름
- * @returns {Promise<object | null>} 해당 측정소의 대기 질 정보 객체 (실패 시 null)
- */
-const getAirQualityByStationName = async (stationName) => {
-  const serviceKey = process.env.AIRKOREA_API_KEY;
-  const url = 'https://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getMsrstnAcctoRltmMesureDnsty';
-
-  if (!serviceKey) {
-    logger.error('AirKorea API key is missing for getAirQualityByStationName.');
-    // 에러를 throw하는 대신 null을 반환하여, 대기질 정보 전체가 실패하지 않도록 함
-    return null;
-  }
-  if (!stationName) {
-    logger.warn('Station name is required for getAirQualityByStationName.');
-    return null;
-  }
-
-  try {
-    const response = await axios.get(url, {
-      params: {
-        serviceKey: serviceKey,
-        returnType: 'json',
-        stationName: stationName, // 입력받은 측정소명 사용
-        dataTerm: 'DAILY', // 요청 자료기간 (시간 : DAILY, 월 : MONTH, 3개월 : 3MONTH) - 보통 최근 측정값은 DAILY 사용
-        ver: '1.3', // API 문서 버전 참고
-      },
-    });
-
-    // API 응답 구조 확인 및 데이터 추출
-    if (response.data?.response?.body?.items && response.data.response.body.items.length > 0) {
-      // API는 보통 최근 측정값 하나를 반환합니다.
-      const data = response.data.response.body.items[0];
-      const airQualityData = {
-        dataTime: data.dataTime, // 측정 시간
-        pm10Value: data.pm10Value, // 미세먼지(PM10) 농도 (단위: µg/m³)
-        pm25Value: data.pm25Value, // 초미세먼지(PM2.5) 농도 (단위: µg/m³)
-        o3Value: data.o3Value, // 오존(O3) 농도 (단위: ppm)
-        coValue: data.coValue, // 일산화탄소(CO) 농도 (단위: ppm)
-        so2Value: data.so2Value, // 아황산가스(SO2) 농도 (단위: ppm)
-        no2Value: data.no2Value, // 이산화질소(NO2) 농도 (단위: ppm)
-        khaiGrade: data.khaiGrade, // 통합대기환경지수 등급 (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨)
-        khaiValue: data.khaiValue, // 통합대기환경지수 값
-      };
-      logger.debug(`Fetched air quality for station ${stationName}`);
-      return airQualityData;
-    } else {
-      logger.warn(
-        `No air quality data found for station ${stationName} or invalid API response format. Msg: ${response.data?.response?.header?.resultMsg}`,
-      );
-      return null; // 데이터 없거나 실패 시 null 반환
-    }
-  } catch (error) {
-    let errorMessage = `Error fetching air quality for station ${stationName}`;
-    if (error.response) {
-      errorMessage = `AirKorea API Error (getAirQualityByStationName): ${error.response.data?.response?.header?.resultMsg || error.message}`;
-    } else {
-      errorMessage = error.message;
-    }
-    logger.error(errorMessage);
-    return null; // 에러 발생 시 null 반환
-  }
-};
-
-/**
  * 초단기 날씨 예보 요약 가져오기
  * @param {number} lon - 경도
  * @param {number} lat - 위도
@@ -286,7 +155,6 @@ const getWeatherSummary = async (lon, lat) => {
     }
 
     const { header, body } = response.data.response;
-    logger.info(body);
 
     if (header.resultCode !== '00') {
       throw new ServerError(ERROR_CODES.WEATHER_API_ERROR, 400, {
@@ -298,20 +166,19 @@ const getWeatherSummary = async (lon, lat) => {
 
     // 시간별로 예보 데이터 그룹화
     const groupedByTime = originalItemArray.reduce((acc, current) => {
-      const { fcstDate, fcstTime, category, fcstValue } = current;
+      const { fcstTime, category, fcstValue } = current;
 
-      const key = `${fcstDate}-${fcstTime}`;
-      if (!acc[key]) {
-        acc[key] = { fcstDate, fcstTime };
+      if (!acc[fcstTime]) {
+        acc[fcstTime] = { fcstTime };
       }
 
-      acc[key][category] = fcstValue;
+      acc[fcstTime][category] = fcstValue;
       return acc;
     }, {});
 
     // 예보 시간순으로 정렬
     const finalForecast = Object.values(groupedByTime).sort((a, b) =>
-      `${a.fcstDate}${a.fcstTime}`.localeCompare(`${b.fcstDate}${b.fcstTime}`),
+      a.fcstTime.localeCompare(b.fcstTime),
     );
 
     logger.debug(`${finalForecast.length}개의 예보 시간대 조회 완료`);
@@ -328,35 +195,144 @@ const getWeatherSummary = async (lon, lat) => {
 };
 
 /**
- * 위도/경도를 받아 가장 가까운 측정소의 대기 질 정보를 반환합니다.
+ * 기체 농도 단위를 µg/m³에서 ppm으로 변환 (표준 25°C, 1 atm 기준)
+ * @param {number | null | undefined} ug_m3 - 농도 (µg/m³)
+ * @param {'CO' | 'NO2' | 'O3' | 'SO2'} gasType - 기체 종류
+ * @returns {number | null} 변환된 농도 (ppm)
+ */
+const convertUgM3ToPpm = (ug_m3, gasType) => {
+  if (ug_m3 === null || ug_m3 === undefined) return null;
+
+  // EPA(미국 환경보호청) 표준 변환 계수 (근사치)
+  // 1 ppm = X µg/m³  --->  1 µg/m³ = 1/X ppm
+  const CONVERSION_FACTORS = {
+    // 1 ppm CO ≈ 1150 µg/m³
+    CO: 1150,  
+    // 1 ppm NO2 ≈ 1880 µg/m³
+    NO2: 1880, 
+    // 1 ppm O3 ≈ 1960 µg/m³
+    O3: 1960,  
+    // 1 ppm SO2 ≈ 2620 µg/m³
+    SO2: 2620, 
+  };
+
+  const factor = CONVERSION_FACTORS[gasType];
+  if (!factor) {
+    logger.warn(`알 수 없는 기체 타입: ${gasType}`);
+    return null;
+  }
+
+  // ppm = (µg/m³) / (변환 계수)
+  return ug_m3 / factor;
+};
+
+/**
+ * [수정됨] Open-Meteo API를 사용해 위도/경도의 대기 질 정보를 반환합니다.
  * @param {string} lon - 경도 (WGS84)
  * @param {string} lat - 위도 (WGS84)
  * @returns {Promise<object | null>} 대기 질 정보 객체 (실패 시 null 또는 에러 throw)
  */
 const getAirQualitySummary = async (lon, lat) => {
+  const url = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+
   try {
-    const stationName = await getNearestStationName(lon, lat);
+    const response = await axios.get(url, {
+      params: {
+        latitude: lat,
+        longitude: lon,
+        // (수정) european_aqi (통합지수) 추가
+        hourly: 'pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,european_aqi',
+        timezone: 'Asia/Seoul',
+      },
+    });
 
-    const airQualityData = await getAirQualityByStationName(stationName);
+    if (!response.data || !response.data.hourly) {
+      logger.warn(`No air quality data found from Open-Meteo for coords (${lon}, ${lat})`);
+      return null; 
+    }
 
-    // getAirQualityByStationName 함수가 실패하여 null을 반환했을 경우 처리
-    if (!airQualityData) {
-      logger.warn(`Air quality data is null for station: ${stationName}`);
+    const hourlyData = response.data.hourly;
+    const latestIndex = 0; // API는 시간대별 배열로 반환하므로 가장 최근(첫 번째) 값 사용
+
+    if (!hourlyData.time || hourlyData.time.length === 0) {
+      logger.warn(`Open-Meteo returned empty hourly data for coords (${lon}, ${lat})`);
       return null;
     }
 
+    // 1. Open-Meteo에서 원본 값(µg/m³) 추출
+    const pm10_ug = hourlyData.pm10[latestIndex];
+    const pm25_ug = hourlyData.pm2_5[latestIndex];
+    const o3_ug = hourlyData.ozone[latestIndex];
+    const co_ug = hourlyData.carbon_monoxide[latestIndex];
+    const so2_ug = hourlyData.sulphur_dioxide[latestIndex];
+    const no2_ug = hourlyData.nitrogen_dioxide[latestIndex];
+    const aqi = hourlyData.european_aqi[latestIndex]; // 유럽 AQI (1-5등급)
+
+    // 2. [핵심] µg/m³ -> ppm 단위 변환 (헬퍼 함수 사용)
+    // 스크린샷의 소수점 자릿수에 맞춰 포맷팅
+    const o3_ppm = o3_ug !== null ? parseFloat(convertUgM3ToPpm(o3_ug, 'O3').toFixed(4)) : null;
+    const co_ppm = co_ug !== null ? parseFloat(convertUgM3ToPpm(co_ug, 'CO').toFixed(2)) : null;
+    const so2_ppm = so2_ug !== null ? parseFloat(convertUgM3ToPpm(so2_ug, 'SO2').toFixed(4)) : null;
+    const no2_ppm = no2_ug !== null ? parseFloat(convertUgM3ToPpm(no2_ug, 'NO2').toFixed(4)) : null;
+
+    // 3. 에어코리아 형식과 동일한 객체로 구성
+    const airQualityData = {
+      dataTime: hourlyData.time[latestIndex], // 측정 시간
+      
+      // PM-10 (µg/m³): 단위 일치
+      pm10Value: pm10_ug, 
+      
+      // PM-2.5 (µg/m³): 단위 일치
+      pm25Value: pm25_ug, 
+      
+      // 오존 (ppm): 단위 변환
+      o3Value: o3_ppm,
+      
+      // 이산화질소 (ppm): 단위 변환
+      no2Value: no2_ppm,
+      
+      // 일산화탄소 (ppm): 단위 변환
+      coValue: co_ppm,
+      
+      // 아황산가스 (ppm): 단위 변환
+      so2Value: so2_ppm,
+      
+      // (대체) khaiGrade -> European AQI (1-5 스케일)
+      // *참고: Open-Meteo는 한국형 통합지수(khai)가 아닌 유럽형(european_aqi)을 제공합니다. 
+      //  (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨, 5:극히나쁨)
+      khaiGrade: aqi, 
+      
+      // (제공 안함) khaiValue는 Open-Meteo에 해당 값이 없습니다.
+      khaiValue: null, 
+      
+      source: 'Open-Meteo (Units Converted)',
+    };
+
+    logger.debug(`Fetched and converted air quality from Open-Meteo for (${lon}, ${lat})`);
     return airQualityData;
+
   } catch (error) {
-    logger.error(`Error in getAirQualitySummary: ${error.message}`);
-    throw error;
+    let errorMessage = 'Error fetching Open-Meteo air quality';
+    let statusCode = 500;
+
+    if (error.response) {
+      errorMessage = `Open-Meteo API Error: ${error.response.data?.reason || error.message}`;
+      statusCode = error.response.status;
+    } else {
+      errorMessage = error.message;
+    }
+    
+    logger.error(errorMessage, { error: error.message });
+
+    throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, statusCode, {
+      message: errorMessage,
+    });
   }
 };
 
 module.exports = {
   getDateTimeForWeatherSummary,
   getNxNy,
-  getNearestStationName,
-  getAirQualityByStationName,
   getAirQualitySummary,
   getWeatherSummary,
 };
