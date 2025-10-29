@@ -18,15 +18,17 @@ const { authenticateToken } = require('@middleware/auth');
  *       - in: query
  *         name: lon
  *         schema:
- *         type: string
+ *           type: string
  *         required: true
- *         description: Longitude
+ *         description: 경도
+ *         example: "126.9780"
  *       - in: query
  *         name: lat
  *         schema:
  *           type: string
  *         required: true
- *         description: Latitude
+ *         description: 위도
+ *         example: "37.5665"
  *     responses:
  *       '200':
  *         description: Successful response with air quality data
