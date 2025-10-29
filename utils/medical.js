@@ -1,14 +1,19 @@
 const axios = require('axios');
-const xml2js = require('xml2js');
+// const xml2js = require('xml2js'); // <--- [제거]
 const { logger } = require('@utils/logger');
 
 // XML 파서 인스턴스 (재사용 가능)
-const parser = new xml2js.Parser({ explicitArray: false });
+// const parser = new xml2js.Parser({ explicitArray: false }); // <--- [제거]
 
 // API 설정
 const ENDPOINT = process.env.NMC_HOSPITAL_ENDPOINT;
 const API_KEY = process.env.NMC_HOSPITAL_KEY;
 const DEFAULT_NUM_ROWS = 10;
+//'조건 기반 검색' API의 운영(Operation) 이름
+const OPERATION_NAME = '/getHsptlMdcncListInfoInqire';
+
+// URLSearchParams 대체를 위한 querystring 모듈
+const querystring = require('querystring');
 
 /**
  * 필수 환경 변수 검증
@@ -21,54 +26,88 @@ const validateEnvironment = () => {
 };
 
 /**
- * 주변 의료 시설 (병원 및 약국) 조회
- * @param {string} lat - 위도 (WGS84_Y)
- * @param {string} lon - 경도 (WGS84_X)
- * @param {number} [numOfRows=10] - 반환할 결과 수
+ * 의료 시설 (병원 및 약국) 조건 검색
+ * @param {object} searchOptions - 검색 조건 객체 (Q0, Q1, QN, pageNo, numOfRows 등)
  * @returns {Promise<Array>} 의료 시설 데이터 배열 (JSON)
  * @throws {Error} API 호출 실패 또는 응답 파싱 실패 시
  */
-const fetchNearbyFacilities = async (lat, lon, numOfRows = DEFAULT_NUM_ROWS) => {
+const searchFacilities = async (searchOptions = {}) => {
+  // let xmlData = null; // <-- [제거]
+
   try {
     validateEnvironment();
 
+    const API_KEY = process.env.NMC_HOSPITAL_KEY;
+    const ENDPOINT = process.env.NMC_HOSPITAL_ENDPOINT;
+
+    logger.info('API Key 확인:', {
+      keyLength: API_KEY?.length,
+      keyPreview: API_KEY?.substring(0, 10) + '...',
+    });
+
     const params = {
-      serviceKey: API_KEY,
-      WGS84_Y: lat,
-      WGS84_X: lon,
-      numOfRows,
+      ServiceKey: API_KEY, // 디코딩된 키
+      ...searchOptions,
     };
+    if (!params.pageNo) {
+      params.pageNo = 1;
+    }
+    if (!params.numOfRows) {
+      params.numOfRows = DEFAULT_NUM_ROWS;
+    }
 
-    logger.debug(`주변 시설 조회 중 - 좌표: ${lat}, ${lon}`);
-    const response = await axios.get(ENDPOINT, { params });
-    const xmlData = response.data;
+    const fullUrl = ENDPOINT.replace(/\/+$/, '') + OPERATION_NAME;
+    
+    logger.info('API 요청 정보:', { 
+      fullUrl,
+      params: JSON.stringify({
+        ...params,
+        ServiceKey: `${String(params.ServiceKey).slice(0, 10)}...`,
+      }),
+    });
+    
+    const response = await axios.get(fullUrl, { params });
 
-    // async/await를 사용하여 XML 데이터를 JSON으로 파싱
-    const result = await parser.parseStringPromise(xmlData);
+    // --- [핵심 수정] ---
+    // axios가 이미 JSON 객체로 파싱해 줌.
+    const result = response.data; 
+    // const xmlData = response.data; // [제거]
+    // const result = await parser.parseStringPromise(xmlData); // [제거]
+    // ---------------
 
-    // 파싱된 결과에서 항목 추출
+    // 공공데이터 API 오류 응답 처리 (response.header.resultCode !== '00')
+    if (result.response?.header?.resultCode !== '00') {
+      logger.warn('NMC API가 오류 응답을 반환했습니다.', {
+        code: result.response?.header?.resultCode,
+        msg: result.response?.header?.resultMsg,
+      });
+      return [];
+    }
+
     const items = result.response?.body?.items?.item;
 
-    // 배열 반환 (단일 항목과 다중 항목 모두 처리)
     if (!items) {
-      logger.debug('주변 의료시설을 찾을 수 없음');
+      logger.info('검색 조건에 맞는 의료시설을 찾을 수 없음'); // info로 변경
       return [];
     }
 
     return Array.isArray(items) ? items : [items];
+
   } catch (error) {
+    // catch 블록은 원본 유지 (XML 파싱 오류는 이제 발생하지 않아야 함)
     if (error.response) {
-      logger.error('NMC API 오류', {
-        statusCode: error.response.status,
+      logger.error('--- 외부 API(NMC)가 HTTP 오류를 반환함 ---', {
+        status: error.response.status,
         data: error.response.data,
       });
-    } else if (error.message.includes('parseStringPromise')) {
-      logger.error('의료 API XML 응답 파싱 실패');
+    } else if (error.message.includes('parseStringPromise') || error.message.includes('Non-whitespace')) {
+      logger.error(`--- 의료 API XML 파싱 실패: ${error.message} ---`);
+      // 이 오류는 이제 발생하면 안 됨
     } else {
-      logger.error(`의료 API 네트워크 오류: ${error.message}`);
+      logger.error(`의료 API 네트워크/기타 오류: ${error.message}`);
     }
-    throw new Error('주변 의료시설 조회 실패');
+    throw new Error('의료시설 조건 검색 실패');
   }
 };
 
-module.exports = { fetchNearbyFacilities };
+module.exports = { searchFacilities };
