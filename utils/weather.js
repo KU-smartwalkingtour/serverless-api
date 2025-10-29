@@ -286,6 +286,7 @@ const getWeatherSummary = async (lon, lat) => {
     }
 
     const { header, body } = response.data.response;
+    logger.info(body);
 
     if (header.resultCode !== '00') {
       throw new ServerError(ERROR_CODES.WEATHER_API_ERROR, 400, {
@@ -297,19 +298,20 @@ const getWeatherSummary = async (lon, lat) => {
 
     // 시간별로 예보 데이터 그룹화
     const groupedByTime = originalItemArray.reduce((acc, current) => {
-      const { fcstTime, category, fcstValue } = current;
+      const { fcstDate, fcstTime, category, fcstValue } = current;
 
-      if (!acc[fcstTime]) {
-        acc[fcstTime] = { fcstTime };
+      const key = `${fcstDate}-${fcstTime}`;
+      if (!acc[key]) {
+        acc[key] = { fcstDate, fcstTime };
       }
 
-      acc[fcstTime][category] = fcstValue;
+      acc[key][category] = fcstValue;
       return acc;
     }, {});
 
     // 예보 시간순으로 정렬
     const finalForecast = Object.values(groupedByTime).sort((a, b) =>
-      a.fcstTime.localeCompare(b.fcstTime),
+      `${a.fcstDate}${a.fcstTime}`.localeCompare(`${b.fcstDate}${b.fcstTime}`),
     );
 
     logger.debug(`${finalForecast.length}개의 예보 시간대 조회 완료`);
