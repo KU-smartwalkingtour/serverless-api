@@ -1,7 +1,7 @@
 {
   "name": "today_weather_summary",
   "version": "1.0.0",
-  "description": "",
+  "description": "- [Node.js](https://nodejs.org/)\r - npm (Node.js 설치 시 자동 설치)",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -46,11 +46,12 @@
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2"
   },
-  "_moduleAliases": {
-    "@models": "./models",
-    "@routes": "./routes",
-    "@utils": "./utils",
-    "@middleware": "./middleware",
-    "@config": "./config"
-  }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KU-cloudwebservice-team10/api-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KU-cloudwebservice-team10/api-server/issues"
+  },
+  "homepage": "https://github.com/KU-cloudwebservice-team10/api-server#readme"
 }
