@@ -63,7 +63,7 @@ const { authenticateToken } = require('@middleware/auth');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/air-quality', authenticateToken, async (req, res) => {
+router.get('/airquality', authenticateToken, async (req, res) => {
   try {
     const { lon, lat } = req.query;
 
