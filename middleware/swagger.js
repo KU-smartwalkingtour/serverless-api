@@ -449,6 +449,23 @@ const swaggerOptions = {
             },
           },
         },
+        CoordinatePoint: {
+          type: 'object',
+          properties: {
+            lat: {
+              type: 'number',
+              format: 'float',
+              description: '위도',
+              example: 37.689050,
+            },
+            lon: {
+              type: 'number',
+              format: 'float',
+              description: '경도',
+              example: 127.045876,
+            },
+          },
+        },
         UserSavedCourse: {
           type: 'object',
           properties: {

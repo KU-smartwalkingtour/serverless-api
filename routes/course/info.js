@@ -24,6 +24,12 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
  *     responses:
  *       200:
  *         description: 코스 경로의 좌표 배열
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/CoordinatePoint'
  *       400:
  *         description: courseId 파라미터가 누락되었습니다.
  *         content:
