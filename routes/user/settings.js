@@ -69,7 +69,8 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
  */
 router.patch('/', authenticateToken, async (req, res) => {
   try {
-    const { nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage } = req.body;
+    const { nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage } =
+      req.body;
     const user = req.user;
 
     // 업데이트할 필드 수집
@@ -78,7 +79,8 @@ router.patch('/', authenticateToken, async (req, res) => {
     if (language !== undefined) updates.language = language;
     if (distance_unit !== undefined) updates.distance_unit = distance_unit;
     if (is_dark_mode_enabled !== undefined) updates.is_dark_mode_enabled = is_dark_mode_enabled;
-    if (allow_location_storage !== undefined) updates.allow_location_storage = allow_location_storage;
+    if (allow_location_storage !== undefined)
+      updates.allow_location_storage = allow_location_storage;
 
     if (Object.keys(updates).length === 0) {
       throw new ServerError(ERROR_CODES.NO_FIELDS_TO_UPDATE, 400);
@@ -88,7 +90,13 @@ router.patch('/', authenticateToken, async (req, res) => {
     await user.reload();
 
     logger.info(`사용자 설정 업데이트: ${user.email}`);
-    res.status(200).json({ nickname: user.nickname, language: user.language, distance_unit: user.distance_unit, is_dark_mode_enabled: user.is_dark_mode_enabled, allow_location_storage: user.allow_location_storage });
+    res.status(200).json({
+      nickname: user.nickname,
+      language: user.language,
+      distance_unit: user.distance_unit,
+      is_dark_mode_enabled: user.is_dark_mode_enabled,
+      allow_location_storage: user.allow_location_storage,
+    });
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());

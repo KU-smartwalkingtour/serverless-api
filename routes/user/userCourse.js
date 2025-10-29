@@ -54,7 +54,7 @@ router.get('/saved-courses', authenticateToken, async (req, res) => {
       return res.json([]);
     }
 
-    const courseIds = savedCourseLinks.map(link => link.course_id);
+    const courseIds = savedCourseLinks.map((link) => link.course_id);
 
     const savedCourses = await Course.findAll({
       where: {
@@ -178,7 +178,11 @@ router.delete('/saved-courses/:courseId', authenticateToken, async (req, res) =>
     if (deletedCount > 0) {
       res.status(200).json({ message: '코스가 성공적으로 삭제되었습니다.' });
     } else {
-      throw new ServerError(ERROR_CODES.RESOURCE_NOT_FOUND, 404, '저장 목록에서 코스를 찾을 수 없습니다.');
+      throw new ServerError(
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        404,
+        '저장 목록에서 코스를 찾을 수 없습니다.',
+      );
     }
   } catch (error) {
     if (ServerError.isServerError(error)) {
@@ -294,10 +298,12 @@ router.put('/recent-courses/:courseId', authenticateToken, async (req, res) => {
         {
           replacements: { userId, courseId: courseId.toString() },
           type: UserRecentCourse.sequelize.QueryTypes.UPDATE,
-        }
+        },
       );
       await recentCourse.reload();
-      res.status(200).json({ message: '이미 목록에 있는 코스를 업데이트했습니다.', data: recentCourse });
+      res
+        .status(200)
+        .json({ message: '이미 목록에 있는 코스를 업데이트했습니다.', data: recentCourse });
     } else {
       // Entry does not exist, create it
       const newRecentCourse = await UserRecentCourse.create({
@@ -361,7 +367,11 @@ router.delete('/recent-courses/:courseId', authenticateToken, async (req, res) =
     if (deletedCount > 0) {
       res.status(200).json({ message: '코스가 성공적으로 삭제되었습니다.' });
     } else {
-      throw new ServerError(ERROR_CODES.RESOURCE_NOT_FOUND, 404, '목록에서 코스를 찾을 수 없습니다.');
+      throw new ServerError(
+        ERROR_CODES.RESOURCE_NOT_FOUND,
+        404,
+        '목록에서 코스를 찾을 수 없습니다.',
+      );
     }
   } catch (error) {
     if (ServerError.isServerError(error)) {

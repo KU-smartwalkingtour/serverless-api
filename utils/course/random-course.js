@@ -13,7 +13,7 @@ const getRandomCourses = async (n) => {
       limit: n,
       attributes: ['course_id'],
     });
-    return courses.map(course => course.course_id);
+    return courses.map((course) => course.course_id);
   } catch (error) {
     throw new Error(`데이터베이스에서 랜덤 코스 조회 중 오류 발생: ${error.message}`);
   }

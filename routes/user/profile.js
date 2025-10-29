@@ -61,8 +61,24 @@ router.get('/profile', authenticateToken, async (req, res) => {
     const saved_courses_count = await UserSavedCourse.count({ where: { user_id: req.user.id } });
     const recent_courses_count = await UserRecentCourse.count({ where: { user_id: req.user.id } });
 
-    const { email, nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage } = user;
-    res.json({ email, nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage, saved_courses_count, recent_courses_count });
+    const {
+      email,
+      nickname,
+      language,
+      distance_unit,
+      is_dark_mode_enabled,
+      allow_location_storage,
+    } = user;
+    res.json({
+      email,
+      nickname,
+      language,
+      distance_unit,
+      is_dark_mode_enabled,
+      allow_location_storage,
+      saved_courses_count,
+      recent_courses_count,
+    });
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());

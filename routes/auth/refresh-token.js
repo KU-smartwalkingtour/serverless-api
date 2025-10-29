@@ -1,15 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { logger } = require('@utils/logger');
 const { Sequelize } = require('sequelize');
+const sequelize = require('@config/database');
 const { User, AuthRefreshToken } = require('@models');
+const { generateTokens } = require('@utils/auth');
 const { validate, refreshTokenSchema } = require('@utils/validation');
 const { ServerError, ERROR_CODES } = require('@utils/error');
-
-// 상수 정의
-const ACCESS_TOKEN_EXPIRY = '15m';
 
 /**
  * 리프레시 토큰을 SHA256 해시로 변환
@@ -40,7 +38,7 @@ const hashToken = (token) => {
  *                 description: 리프레시 토큰
  *     responses:
  *       200:
- *         description: 새 액세스 토큰이 성공적으로 발급되었습니다.
+ *         description: 새 액세스 토큰 및 리프레시 토큰이 성공적으로 발급되었습니다.
  *         content:
  *           application/json:
  *             schema:
@@ -49,6 +47,9 @@ const hashToken = (token) => {
  *                 accessToken:
  *                   type: string
  *                   description: 새로 발급된 JWT 액세스 토큰
+ *                 refreshToken:
+ *                   type: string
+ *                   description: 새로 발급된 리프레시 토큰 (Refresh Token Rotation)
  *       400:
  *         description: 입력값이 유효하지 않음
  *         content:
@@ -101,16 +102,32 @@ router.post('/', validate(refreshTokenSchema), async (req, res) => {
       throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 403);
     }
 
-    // 새 액세스 토큰 발급
-    const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-      expiresIn: ACCESS_TOKEN_EXPIRY,
+    // Refresh Token Rotation: 트랜잭션으로 기존 토큰 폐기 + 새 토큰 발급
+    let newAccessToken, newRefreshToken;
+
+    await sequelize.transaction(async (t) => {
+      // 1. 기존 리프레시 토큰 폐기
+      await storedToken.update({ revoked_at: new Date() }, { transaction: t });
+
+      logger.info('기존 리프레시 토큰 폐기 완료', {
+        userId: user.id,
+        tokenId: storedToken.id,
+      });
+
+      // 2. 새 액세스 토큰 및 리프레시 토큰 발급
+      const tokens = await generateTokens(user);
+      newAccessToken = tokens.accessToken;
+      newRefreshToken = tokens.refreshToken;
     });
 
-    logger.info('액세스 토큰 갱신 완료', {
+    logger.info('토큰 갱신 완료 (Refresh Token Rotation)', {
       userId: user.id,
     });
 
-    res.json({ accessToken });
+    res.json({
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    });
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());

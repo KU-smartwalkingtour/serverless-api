@@ -32,34 +32,34 @@ const getDistance = (lat1, lon1, lat2, lon2) => {
  * @returns {Promise<string|null>} 가장 가까운 코스의 ID 또는 null
  */
 const findClosestCourse = async (lat, lon) => {
-    const courses = await Course.findAll({
-        attributes: ['course_id', 'start_lat', 'start_lon'],
-        where: {
-            start_lat: {
-                [Op.ne]: null
-            },
-            start_lon: {
-                [Op.ne]: null
-            }
-        }
-    });
+  const courses = await Course.findAll({
+    attributes: ['course_id', 'start_lat', 'start_lon'],
+    where: {
+      start_lat: {
+        [Op.ne]: null,
+      },
+      start_lon: {
+        [Op.ne]: null,
+      },
+    },
+  });
 
-    if (!courses || courses.length === 0) {
-        return null;
+  if (!courses || courses.length === 0) {
+    return null;
+  }
+
+  let closestCourseId = null;
+  let minDistance = Infinity;
+
+  for (const course of courses) {
+    const distance = getDistance(lat, lon, course.start_lat, course.start_lon);
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestCourseId = course.course_id;
     }
+  }
 
-    let closestCourseId = null;
-    let minDistance = Infinity;
-
-    for (const course of courses) {
-        const distance = getDistance(lat, lon, course.start_lat, course.start_lon);
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestCourseId = course.course_id;
-        }
-    }
-
-    return closestCourseId;
+  return closestCourseId;
 };
 
 /**
@@ -70,30 +70,30 @@ const findClosestCourse = async (lat, lon) => {
  * @returns {Promise<Array<string>>} 거리순으로 정렬된 코스 ID 배열
  */
 const findNClosestCourses = async (lat, lon, n) => {
-    const courses = await Course.findAll({
-        attributes: ['course_id', 'start_lat', 'start_lon'],
-        where: {
-            start_lat: {
-                [Op.ne]: null
-            },
-            start_lon: {
-                [Op.ne]: null
-            }
-        }
-    });
+  const courses = await Course.findAll({
+    attributes: ['course_id', 'start_lat', 'start_lon'],
+    where: {
+      start_lat: {
+        [Op.ne]: null,
+      },
+      start_lon: {
+        [Op.ne]: null,
+      },
+    },
+  });
 
-    if (!courses || courses.length === 0) {
-        return [];
-    }
+  if (!courses || courses.length === 0) {
+    return [];
+  }
 
-    const coursesWithDistance = courses.map(course => {
-        const distance = getDistance(lat, lon, course.start_lat, course.start_lon);
-        return { course_id: course.course_id, distance };
-    });
+  const coursesWithDistance = courses.map((course) => {
+    const distance = getDistance(lat, lon, course.start_lat, course.start_lon);
+    return { course_id: course.course_id, distance };
+  });
 
-    coursesWithDistance.sort((a, b) => a.distance - b.distance);
+  coursesWithDistance.sort((a, b) => a.distance - b.distance);
 
-    return coursesWithDistance.slice(0, n).map(c => c.course_id);
+  return coursesWithDistance.slice(0, n).map((c) => c.course_id);
 };
 
 module.exports = { findClosestCourse, findNClosestCourses, getDistance };
