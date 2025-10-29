@@ -28,7 +28,49 @@ const logCourseView = async (userId, courseId, provider) => {
   }
 };
 
+
+/**
+ * 분 단위를 "X시간 Y분" 형태의 문자열로 변환하는 함수
+ * @param {number} minutes - 분
+ * @returns {string} 변환된 문자열
+ */
+const formatDuration = (minutes) => {
+  if (minutes === null || minutes === undefined) {
+    return '';
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  let result = '';
+  if (hours > 0) {
+    result += `${hours}시간 `;
+  }
+  if (remainingMinutes > 0) {
+    result += `${remainingMinutes}분`;
+  }
+  return result.trim();
+};
+
+/**
+ * 난이도 Enum 값을 문자열로 매핑하는 함수
+ * @param {string} difficulty - 난이도 Enum 값 ('하', '중', '상')
+ * @returns {string} 매핑된 문자열 ('쉬움', '보통', '어려움')
+ */
+const mapDifficulty = (difficulty) => {
+  switch (difficulty) {
+    case '하':
+      return '쉬움';
+    case '중':
+      return '보통';
+    case '상':
+      return '어려움';
+    default:
+      return '';
+  }
+};
+
 module.exports = {
   getProviderFromCourseId,
   logCourseView,
+  formatDuration,
+  mapDifficulty,
 };

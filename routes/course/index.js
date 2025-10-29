@@ -5,10 +5,19 @@ const router = express.Router();
 const searchRouter = require('./search');
 const infoRouter = require('./info');
 const savedRouter = require('./saved');
+const homeRouter = require('./home');
+const listRouter = require('./list');
+const detailRouter = require('./detail');
+
 
 // 라우트 등록
 router.use('/', searchRouter);
 router.use('/', infoRouter);
 router.use('/', savedRouter);
+
+router.use('/home', homeRouter);
+router.use('/', detailRouter);
+router.use('/', listRouter);
+
 
 module.exports = router;
