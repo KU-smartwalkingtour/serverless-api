@@ -49,20 +49,7 @@ const sanitizeUser = (user) => ({
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 accessToken:
- *                   type: string
- *                   description: JWT 액세스 토큰
- *                 refreshToken:
- *                   type: string
- *                   description: 리프레시 토큰
- *                 user:
- *                   type: object
- *                   properties:
- *                     id: { type: string, format: uuid, description: 사용자 ID }
- *                     email: { type: string, format: email, description: 이메일 }
- *                     nickname: { type: string, description: 닉네임 }
+ *               $ref: '#/components/schemas/AuthResponse'
  *       400:
  *         description: 입력값이 유효하지 않음
  *         content:

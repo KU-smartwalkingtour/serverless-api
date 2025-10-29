@@ -204,38 +204,248 @@ const swaggerOptions = {
           properties: {
             course_id: {
               type: 'string',
+              description: '코스 ID',
+              example: 'seoultrail_1',
             },
             course_name: {
               type: 'string',
+              description: '코스명',
+              example: '서울둘레길 1코스',
             },
             course_type: {
               type: 'string',
               enum: ['seoul_trail', 'durunubi'],
+              description: '코스 타입',
+              example: 'seoul_trail',
             },
             course_length: {
               type: 'number',
               format: 'decimal',
+              description: '코스 길이 (km)',
+              example: 18.6,
             },
             course_duration: {
               type: 'integer',
+              description: '예상 소요 시간 (분)',
+              example: 360,
             },
             course_difficulty: {
               type: 'string',
               enum: ['하', '중', '상'],
+              description: '난이도',
+              example: '중',
             },
             course_description: {
               type: 'string',
+              description: '코스 설명',
+              example: '개화산과 방화동을 거쳐 길동자연생태공원까지',
             },
             location: {
               type: 'string',
+              description: '위치 정보',
+              example: '서울시 강서구',
             },
             start_lat: {
               type: 'number',
               format: 'decimal',
+              description: '시작 위도',
+              example: 37.5665,
             },
             start_lon: {
               type: 'number',
               format: 'decimal',
+              description: '시작 경도',
+              example: 126.9780,
+            },
+            road_name_address: {
+              type: 'string',
+              description: '도로명 주소',
+              example: '서울시 강서구 개화동',
+            },
+          },
+        },
+        AuthResponse: {
+          type: 'object',
+          properties: {
+            accessToken: {
+              type: 'string',
+              description: 'JWT 액세스 토큰',
+              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            },
+            refreshToken: {
+              type: 'string',
+              description: '리프레시 토큰',
+              example: 'a1b2c3d4e5f6...',
+            },
+            user: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'string',
+                  format: 'uuid',
+                  description: '사용자 ID',
+                  example: '123e4567-e89b-12d3-a456-426614174000',
+                },
+                email: {
+                  type: 'string',
+                  format: 'email',
+                  description: '이메일',
+                  example: 'user@example.com',
+                },
+                nickname: {
+                  type: 'string',
+                  description: '닉네임',
+                  example: '홍길동',
+                },
+              },
+            },
+          },
+        },
+        UserProfile: {
+          type: 'object',
+          properties: {
+            email: {
+              type: 'string',
+              format: 'email',
+              description: '이메일 주소',
+              example: 'user@example.com',
+            },
+            nickname: {
+              type: 'string',
+              description: '닉네임',
+              example: '홍길동',
+            },
+            language: {
+              type: 'string',
+              description: '선호 언어',
+              example: 'ko',
+            },
+            distance_unit: {
+              type: 'string',
+              enum: ['km', 'mi'],
+              description: '거리 단위',
+              example: 'km',
+            },
+            is_dark_mode_enabled: {
+              type: 'boolean',
+              description: '다크 모드 활성화 여부',
+              example: false,
+            },
+            allow_location_storage: {
+              type: 'boolean',
+              description: '위치 정보 저장 허용 여부',
+              example: true,
+            },
+            saved_courses_count: {
+              type: 'integer',
+              description: '저장한 코스 개수',
+              example: 5,
+            },
+            recent_courses_count: {
+              type: 'integer',
+              description: '최근 본 코스 개수',
+              example: 10,
+            },
+          },
+        },
+        MedicalFacility: {
+          type: 'object',
+          properties: {
+            dutyAddr: {
+              type: 'string',
+              description: '주소',
+              example: '서울시 강남구 역삼동 123-45',
+            },
+            dutyName: {
+              type: 'string',
+              description: '시설명',
+              example: '서울대학병원',
+            },
+            dutyTel1: {
+              type: 'string',
+              description: '전화번호',
+              example: '02-1234-5678',
+            },
+            latitude: {
+              type: 'number',
+              format: 'float',
+              description: '위도',
+              example: 37.5665,
+            },
+            longitude: {
+              type: 'number',
+              format: 'float',
+              description: '경도',
+              example: 126.9780,
+            },
+            distance: {
+              type: 'number',
+              format: 'float',
+              description: '사용자로부터의 거리(km)',
+              example: 1.5,
+            },
+          },
+        },
+        WeatherData: {
+          type: 'object',
+          properties: {
+            T1H: {
+              type: 'string',
+              description: '기온 (°C)',
+              example: '15',
+            },
+            RN1: {
+              type: 'string',
+              description: '1시간 강수량 (mm)',
+              example: '0',
+            },
+            SKY: {
+              type: 'string',
+              description: '하늘 상태 코드 (1:맑음, 3:구름많음, 4:흐림)',
+              example: '1',
+            },
+            PTY: {
+              type: 'string',
+              description: '강수 형태 코드 (0:없음, 1:비, 2:비/눈, 3:눈)',
+              example: '0',
+            },
+          },
+        },
+        AirQualityData: {
+          type: 'object',
+          properties: {
+            pm10Value: {
+              type: 'string',
+              description: 'PM10 농도 (μg/m³)',
+              example: '30',
+            },
+            pm25Value: {
+              type: 'string',
+              description: 'PM2.5 농도 (μg/m³)',
+              example: '15',
+            },
+            khaiValue: {
+              type: 'string',
+              description: '통합대기환경지수',
+              example: '65',
+            },
+            khaiGrade: {
+              type: 'string',
+              description: '통합대기환경지수 등급 (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨)',
+              example: '2',
+            },
+          },
+        },
+        IntegratedWeatherResponse: {
+          type: 'object',
+          properties: {
+            weather: {
+              oneOf: [{ $ref: '#/components/schemas/WeatherData' }, { type: 'null' }],
+              description: '날씨 정보 (실패 시 null)',
+            },
+            airQuality: {
+              oneOf: [{ $ref: '#/components/schemas/AirQualityData' }, { type: 'null' }],
+              description: '대기질 정보 (실패 시 null)',
             },
           },
         },
