@@ -8,7 +8,7 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
- * /courses/home:
+ * /course/home:
  *   get:
  *     summary: 홈 탭에서 가까운 코스 목록 조회
  *     description: 현재 위치를 기준으로 가까운 순서대로 N개의 코스를 조회합니다.
