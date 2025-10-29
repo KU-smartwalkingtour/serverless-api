@@ -5,7 +5,6 @@ const { findNClosestCourses } = require('@utils/course/closest-course');
 const { logger } = require('@utils/logger');
 const { authenticateToken } = require('@middleware/auth');
 const { ServerError, ERROR_CODES } = require('@utils/error');
-const { formatDuration, mapDifficulty } = require('@utils/course/course-helpers');
 
 /**
  * @swagger
@@ -36,26 +35,31 @@ const { formatDuration, mapDifficulty } = require('@utils/course/course-helpers'
  *         example: 5
  *     responses:
  *       200:
- *         description: 가까운 코스 목록 조회 성공
+ *         description: 가까운 코스 목록 (최신순)
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
- *                 type: object
- *                 properties:
- *                   course_name: { type: string }
- *                   course_difficulty: { type: string }
- *                   course_discription: { type: string }
- *                   course_length: { type: string }
- *                   course_duration: { type: string }
- *                   course_type: { type: string }
+ *                 $ref: '#/components/schemas/Course'
  *       400:
  *         description: 잘못된 요청 파라미터
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: 인증되지 않음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: 서버 오류
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
@@ -73,16 +77,7 @@ router.get('/', authenticateToken, async (req, res) => {
       },
     });
 
-    const formattedCourses = courses.map(course => ({
-      course_name: course.course_name,
-      course_difficulty: mapDifficulty(course.course_difficulty),
-      course_discription: course.course_description,
-      course_length: course.course_length,
-      course_duration: formatDuration(course.course_duration),
-      course_type: course.course_type,
-    }));
-
-    res.json(formattedCourses);
+    res.json(courses);
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());
