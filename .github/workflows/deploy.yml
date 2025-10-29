@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - deploy/prod
+      - feat/email
   pull_request:
     branches:
       - deploy/prod

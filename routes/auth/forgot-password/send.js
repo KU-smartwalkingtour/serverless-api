@@ -5,6 +5,7 @@ const { logger } = require('@utils/logger');
 const { User, PasswordResetRequest } = require('@models');
 const { validate, forgotPasswordSchema } = require('@utils/validation');
 const { ServerError, ERROR_CODES } = require('@utils/error');
+const { sendPasswordResetEmail } = require('@utils/sendEmail');
 
 // 상수 정의
 const CODE_EXPIRY_MINUTES = 10;
@@ -80,16 +81,7 @@ router.post('/', validate(forgotPasswordSchema), async (req, res) => {
       expires_at,
     });
 
-    // TODO: 이메일 전송 로직 구현
-    // 이메일 서비스(예: SendGrid, AWS SES, Nodemailer 등)를 사용하여
-    // 사용자에게 인증 코드를 포함한 이메일을 전송해야 합니다.
-    // 예시:
-    // await sendEmail({
-    //   to: user.email,
-    //   subject: '비밀번호 재설정 인증 코드',
-    //   text: `인증 코드: ${code}`,
-    //   html: `<p>인증 코드: <strong>${code}</strong></p>`,
-    // });
+    await sendPasswordResetEmail({ toEmail: user.email, code });
 
     // 보안: 인증 코드는 로그에 기록하지 않음
     logger.info('비밀번호 재설정 코드 생성', { userId: user.id });
