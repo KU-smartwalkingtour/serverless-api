@@ -199,18 +199,30 @@ router.delete('/saved-courses/:courseId', authenticateToken, async (req, res) =>
  * @swagger
  * /user/courses/recent-courses:
  *   get:
- *     summary: 사용자 최근 본 코스 목록 조회
+ *     summary: 사용자 최근 본 코스 목록 조회 (전체 코스 정보 포함)
+ *     description: 최근 본 코스 목록을 Course 테이블과 JOIN하여 전체 코스 정보와 함께 반환합니다.
  *     tags: [User Courses]
  *     security: [ { bearerAuth: [] } ]
  *     responses:
  *       '200':
- *         description: 최근 본 코스 목록 (최신순, 최대 50개)
+ *         description: 최근 본 코스 목록 (최신순, 최대 50개, 전체 코스 데이터 포함)
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/UserRecentCourse'
+ *                 allOf:
+ *                   - $ref: '#/components/schemas/Course'
+ *                   - type: object
+ *                     properties:
+ *                       viewed_at:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 코스를 본 시간
+ *                       updated_at:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 마지막으로 본 시간
  *       '401':
  *         description: 인증되지 않음
  *         content:
