@@ -240,29 +240,27 @@ router.get('/recent-courses', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const history = await UserRecentCourse.findAll({
+    const recentCourseLinks = await UserRecentCourse.findAll({
       where: { user_id: userId },
-      include: [
-        {
-          model: Course,
-          as: 'course',
-          required: true, // INNER JOIN으로 Course가 있는 것만 조회
-        },
-      ],
-      order: [['updated_at', 'DESC']], // 본 시간 최신순 정렬
-      limit: 50, // 최근 50개 제한
+      order: [['updated_at', 'DESC']],
+      limit: 50,
     });
 
-    // Course 데이터와 함께 반환
-    const response = history.map((item) => ({
-      ...item.course.toJSON(), // Course의 모든 필드
-      viewed_at: item.viewed_at,
-      updated_at: item.updated_at,
-    }));
+    if (!recentCourseLinks || recentCourseLinks.length === 0) {
+      return res.json([]);
+    }
 
-    res.json(response);
+    const courseIds = recentCourseLinks.map((link) => link.course_id);
+
+    const recentCourses = await Course.findAll({
+      where: {
+        course_id: courseIds,
+      },
+    });
+
+    res.json(recentCourses);
   } catch (error) {
-    logger.error(`코스 히스토리 조회 오류: ${error.message}`);
+    logger.error(`최근 본 코스 조회 오류: ${error.message}`);
     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
     res.status(500).json(serverError.toJSON());
   }
