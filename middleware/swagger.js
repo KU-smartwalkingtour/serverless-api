@@ -262,6 +262,138 @@ const swaggerOptions = {
               description: '도로명 주소',
               example: '서울시 강서구 개화동',
             },
+            medical_facility_info: {
+              type: 'object',
+              description: '가장 가까운 의료시설 정보',
+              nullable: true,
+              properties: {
+                name: {
+                  type: 'string',
+                  description: '의료시설명',
+                  example: '서울대학병원',
+                },
+                address: {
+                  type: 'string',
+                  description: '주소',
+                  example: '서울시 종로구 대학로 101',
+                },
+                tel_main: {
+                  type: 'string',
+                  description: '대표 전화번호',
+                  example: '02-1234-5678',
+                },
+                emergency_room_open: {
+                  type: 'boolean',
+                  description: '응급실 운영 여부',
+                  nullable: true,
+                  example: true,
+                },
+                tel_emergency: {
+                  type: 'string',
+                  description: '응급실 전화번호',
+                  nullable: true,
+                  example: '02-1234-5679',
+                },
+                operating_hours: {
+                  type: 'object',
+                  description: '운영시간',
+                  properties: {
+                    mon_start: {
+                      type: 'string',
+                      description: '월요일 시작시간',
+                      example: '0900',
+                    },
+                    mon_end: {
+                      type: 'string',
+                      description: '월요일 종료시간',
+                      example: '1800',
+                    },
+                    tue_start: {
+                      type: 'string',
+                      description: '화요일 시작시간',
+                      example: '0900',
+                    },
+                    tue_end: {
+                      type: 'string',
+                      description: '화요일 종료시간',
+                      example: '1800',
+                    },
+                    wed_start: {
+                      type: 'string',
+                      description: '수요일 시작시간',
+                      example: '0900',
+                    },
+                    wed_end: {
+                      type: 'string',
+                      description: '수요일 종료시간',
+                      example: '1800',
+                    },
+                    thu_start: {
+                      type: 'string',
+                      description: '목요일 시작시간',
+                      example: '0900',
+                    },
+                    thu_end: {
+                      type: 'string',
+                      description: '목요일 종료시간',
+                      example: '1800',
+                    },
+                    fri_start: {
+                      type: 'string',
+                      description: '금요일 시작시간',
+                      example: '0900',
+                    },
+                    fri_end: {
+                      type: 'string',
+                      description: '금요일 종료시간',
+                      example: '1800',
+                    },
+                    sat_start: {
+                      type: 'string',
+                      description: '토요일 시작시간',
+                      nullable: true,
+                      example: '0900',
+                    },
+                    sat_end: {
+                      type: 'string',
+                      description: '토요일 종료시간',
+                      nullable: true,
+                      example: '1300',
+                    },
+                    sun_start: {
+                      type: 'string',
+                      description: '일요일 시작시간',
+                      nullable: true,
+                      example: null,
+                    },
+                    sun_end: {
+                      type: 'string',
+                      description: '일요일 종료시간',
+                      nullable: true,
+                      example: null,
+                    },
+                    hol_start: {
+                      type: 'string',
+                      description: '공휴일 시작시간',
+                      nullable: true,
+                      example: null,
+                    },
+                    hol_end: {
+                      type: 'string',
+                      description: '공휴일 종료시간',
+                      nullable: true,
+                      example: null,
+                    },
+                  },
+                },
+                distance_from_course_km: {
+                  type: 'number',
+                  format: 'float',
+                  description: '코스로부터의 거리 (km)',
+                  example: 2.5,
+                },
+              },
+            },
           },
         },
         AuthResponse: {
