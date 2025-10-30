@@ -32,6 +32,10 @@ const { authenticateToken } = require('@middleware/auth');
  *     responses:
  *       '200':
  *         description: Successful response with air quality data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AirQualityData'
  *       '400':
  *         description: Latitude(lat) and Longitude(lon) are required
  *         content:

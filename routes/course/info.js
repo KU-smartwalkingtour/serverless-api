@@ -8,14 +8,14 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
 
 /**
  * @swagger
- * /courses/coordinates:
+ * /courses/{courseId}/coordinates:
  *   get:
  *     summary: 특정 코스의 GPS 좌표 조회
  *     description: 코스 ID로 코스 경로의 모든 GPS 좌표를 조회합니다.
  *     tags: [Course]
  *     security: [ { bearerAuth: [] } ]
  *     parameters:
- *       - in: query
+ *       - in: path
  *         name: courseId
  *         required: true
  *         schema: { type: string }
@@ -51,9 +51,9 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/coordinates', authenticateToken, async (req, res) => {
+router.get('/:courseId/coordinates', authenticateToken, async (req, res) => {
   try {
-    const { courseId } = req.query;
+    const { courseId } = req.params;
     if (!courseId) {
       throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }

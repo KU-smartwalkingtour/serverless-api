@@ -75,7 +75,7 @@ router.get('/test', (req, res) => {
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/Facility'
+ *                 $ref: '#/components/schemas/MedicalFacility'
  *       '400':
  *         description: "잘못된 요청 파라미터입니다."
  *       '401':

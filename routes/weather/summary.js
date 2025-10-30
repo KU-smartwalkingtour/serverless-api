@@ -32,6 +32,10 @@ const { authenticateToken } = require('@middleware/auth');
  *     responses:
  *       200:
  *         description: 날씨 요약 정보가 성공적으로 조회되었습니다.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/IntegratedWeatherResponse'
  *       400:
  *         description: 위도와 경도는 필수 파라미터입니다.
  *         content:

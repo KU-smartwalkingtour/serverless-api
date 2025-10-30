@@ -39,14 +39,7 @@ const airQualityRouter = require('./airQuality');
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 weather:
- *                   type: object
- *                   description: 날씨 정보
- *                 airQuality:
- *                   type: object
- *                   description: 대기질 정보
+ *               $ref: '#/components/schemas/IntegratedWeatherResponse'
  *       400:
  *         description: 위도와 경도는 필수 파라미터입니다.
  *         content:
