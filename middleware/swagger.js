@@ -389,50 +389,69 @@ const swaggerOptions = {
         WeatherData: {
           type: 'object',
           properties: {
-            T1H: {
+            temperature: {
               type: 'string',
               description: '기온 (°C)',
-              example: '15',
+              example: '0',
+              nullable: true,
             },
-            RN1: {
+            humidity: {
+              type: 'string',
+              description: '습도 (%)',
+              example: '0',
+              nullable: true,
+            },
+            windSpeed: {
+              type: 'string',
+              description: '풍속 (km/h)',
+              example: '0',
+              nullable: true,
+            },
+            precipitation: {
               type: 'string',
               description: '1시간 강수량 (mm)',
               example: '0',
+              nullable: true,
             },
-            SKY: {
+            skyCondition: {
               type: 'string',
               description: '하늘 상태 코드 (1:맑음, 3:구름많음, 4:흐림)',
               example: '1',
+              nullable: true,
             },
-            PTY: {
+            precipitationType: {
               type: 'string',
               description: '강수 형태 코드 (0:없음, 1:비, 2:비/눈, 3:눈)',
               example: '0',
+              nullable: true,
             },
           },
         },
         AirQualityData: {
           type: 'object',
           properties: {
-            pm10Value: {
+            message: {
               type: 'string',
+              description: '대기질 상태 메시지',
+              example: '보통 수준의 대기질입니다. 민감한 분들은 주의하세요.',
+            },
+            pm10: {
+              type: 'number',
               description: 'PM10 농도 (μg/m³)',
-              example: '30',
+              example: 30,
+              nullable: true,
             },
-            pm25Value: {
-              type: 'string',
+            pm25: {
+              type: 'number',
               description: 'PM2.5 농도 (μg/m³)',
-              example: '15',
+              example: 15,
+              nullable: true,
             },
-            khaiValue: {
-              type: 'string',
-              description: '통합대기환경지수',
-              example: '65',
-            },
-            khaiGrade: {
-              type: 'string',
-              description: '통합대기환경지수 등급 (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨)',
-              example: '2',
+            grade: {
+              type: 'number',
+              description: '대기질 등급 (1:좋음, 2:보통, 3:나쁨, 4:매우나쁨, 5:극히나쁨)',
+              example: 2,
+              nullable: true,
             },
           },
         },

@@ -81,10 +81,52 @@ router.get('/', authenticateToken, async (req, res) => {
       getAirQualitySummary(lon, lat),
     ]);
 
+    // 날씨 데이터 처리 - 첫 번째 시간대 정보만 추출
+    let weatherSummary = null;
+    if (weatherData.status === 'fulfilled' && weatherData.value && weatherData.value.length > 0) {
+      const firstForecast = weatherData.value[0];
+      weatherSummary = {
+        temperature: firstForecast.T1H || null, // 기온
+        humidity: firstForecast.REH || null, // 습도
+        windSpeed: firstForecast.WSD || null, // 풍속
+        precipitation: firstForecast.RN1 || null, // 1시간 강수량
+        skyCondition: firstForecast.SKY || null, // 하늘상태
+        precipitationType: firstForecast.PTY || null, // 강수형태
+      };
+    }
+
+    // 대기질 데이터 처리 - 메시지 생성
+    let airQualitySummary = null;
+    if (airQualityData.status === 'fulfilled' && airQualityData.value) {
+      const aq = airQualityData.value;
+      let message = '보통 수준의 대기질입니다. 민감한 분들은 주의하세요.';
+
+      // khaiGrade (1-5) 기반 메시지 생성
+      if (aq.khaiGrade) {
+        const grade = parseInt(aq.khaiGrade);
+        if (grade === 1) {
+          message = '좋음 수준의 대기질입니다. 외부활동에 적합합니다.';
+        } else if (grade === 2) {
+          message = '보통 수준의 대기질입니다. 민감한 분들은 주의하세요.';
+        } else if (grade === 3) {
+          message = '나쁨 수준의 대기질입니다. 외부활동을 자제하세요.';
+        } else if (grade === 4 || grade === 5) {
+          message = '매우 나쁨 수준의 대기질입니다. 외출을 삼가세요.';
+        }
+      }
+
+      airQualitySummary = {
+        message,
+        pm10: aq.pm10Value || null,
+        pm25: aq.pm25Value || null,
+        grade: aq.khaiGrade || null,
+      };
+    }
+
     // 응답 데이터 구성
     const response = {
-      weather: weatherData.status === 'fulfilled' ? weatherData.value : null,
-      airQuality: airQualityData.status === 'fulfilled' ? airQualityData.value : null,
+      weather: weatherSummary,
+      airQuality: airQualitySummary,
     };
 
     // 날씨 조회 실패 시 경고 로그
