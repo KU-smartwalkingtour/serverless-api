@@ -3,7 +3,7 @@ const { docClient } = require("../config/dynamodbClient"); // ⭐ 경로 수정
 const { logger } = require("../utils/logger");
 
 // ⭐ 테이블 이름 통일
-const TABLE_NAME = "Prod-CourseService"; 
+const TABLE_NAME = "COURSE_DATA_TABLE"; 
 
 // [유틸] 거리 계산 함수 (Haversine formula)
 function getDistance(lat1, lon1, lat2, lon2) {

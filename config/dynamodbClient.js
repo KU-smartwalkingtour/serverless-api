@@ -15,6 +15,7 @@ const docClient = DynamoDBDocumentClient.from(client, {
 });
 
 // 3. 테이블 이름 상수
-const TABLE_NAME = "Prod-CourseService";
+const TABLE_NAME = "COURSE_DATA_TABLE";
+
 
 module.exports = { docClient, TABLE_NAME };
