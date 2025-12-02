@@ -1,10 +1,85 @@
+// const express = require('express');
+// const router = express.Router();
+// const { Course } = require('@models');
+// const { getDistance } = require('@utils/course/closest-course');
+// const { logger } = require('@utils/logger');
+// const { authenticateToken } = require('@middleware/auth');
+// const { ServerError, ERROR_CODES } = require('@utils/error');
+
+// router.get('/course', authenticateToken, async (req, res) => {
+//   try {
+//     const { lat, lon, n, sortBy, difficulty } = req.query;
+
+//     if (!lat || !lon || !n) {
+//       throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
+//     }
+
+//     logger.info(`코스 목록 조회 요청: lat=${lat}, lon=${lon}, n=${n}, sortBy=${sortBy}, difficulty=${difficulty}`);
+
+//     // 모든 코스 조회
+//     let courses = await Course.findAll();
+
+//     // 난이도 필터링 (선택사항)
+//     if (difficulty) {
+//       courses = courses.filter((course) => course.course_difficulty === difficulty);
+//       logger.info(`난이도 필터링 적용: ${difficulty}, 결과 개수: ${courses.length}`);
+//     }
+
+//     // 정렬 기준 적용
+//     if (sortBy === 'distance') {
+//       // 거리순 정렬 (가까운 순)
+//       courses.sort((a, b) => {
+//         const distanceA = getDistance(parseFloat(lat), parseFloat(lon), a.start_lat, a.start_lon);
+//         const distanceB = getDistance(parseFloat(lat), parseFloat(lon), b.start_lat, b.start_lon);
+//         return distanceA - distanceB;
+//       });
+//       logger.info('거리순 정렬 적용');
+//     } else if (sortBy === 'length') {
+//       // 길이순 정렬 (긴 순)
+//       courses.sort((a, b) => b.course_length - a.course_length);
+//       logger.info('길이순 정렬 적용');
+//     } else if (sortBy === 'difficulty') {
+//       // 난이도순 정렬 (하 → 중 → 상)
+//       const difficultyOrder = { 하: 1, 중: 2, 상: 3 };
+//       courses.sort((a, b) => difficultyOrder[a.course_difficulty] - difficultyOrder[b.course_difficulty]);
+//       logger.info('난이도순 정렬 적용');
+//     } else {
+//       // 기본: 거리순 정렬
+//       courses.sort((a, b) => {
+//         const distanceA = getDistance(parseFloat(lat), parseFloat(lon), a.start_lat, a.start_lon);
+//         const distanceB = getDistance(parseFloat(lat), parseFloat(lon), b.start_lat, b.start_lon);
+//         return distanceA - distanceB;
+//       });
+//       logger.info('기본 거리순 정렬 적용');
+//     }
+
+//     // N개로 제한
+//     const paginatedCourses = courses.slice(0, parseInt(n));
+
+//     logger.info(`코스 목록 조회 완료: ${paginatedCourses.length}개 반환`);
+//     res.json(paginatedCourses);
+//   } catch (error) {
+//     if (ServerError.isServerError(error)) {
+//       return res.status(error.statusCode).json(error.toJSON());
+//     }
+
+//     logger.error('코스 목록 조회 오류:', error);
+//     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+//     res.status(500).json(serverError.toJSON());
+//   }
+// });
+
+// module.exports = router;
+
+//-----------------------------------------------------------------------------
+// 여기서부터는 Revised to use DynamoDB instead of RDB
+
 const express = require('express');
 const router = express.Router();
-const { Course } = require('@models');
-const { getDistance } = require('@utils/course/closest-course');
-const { logger } = require('@utils/logger');
-const { authenticateToken } = require('@middleware/auth');
-const { ServerError, ERROR_CODES } = require('@utils/error');
+const { getAllCourses } = require('../../services/courseService'); // DynamoDB 서비스 호출
+const { logger } = require('../../utils/logger');
+const { authenticateToken } = require('../../middleware/auth');
+const { ServerError, ERROR_CODES } = require('../../utils/error');
 
 /**
  * @swagger
@@ -71,6 +146,7 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
+
 router.get('/course', authenticateToken, async (req, res) => {
   try {
     const { lat, lon, n, sortBy, difficulty } = req.query;
@@ -79,55 +155,23 @@ router.get('/course', authenticateToken, async (req, res) => {
       throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
 
-    logger.info(`코스 목록 조회 요청: lat=${lat}, lon=${lon}, n=${n}, sortBy=${sortBy}, difficulty=${difficulty}`);
+    logger.info(`[DynamoDB] 코스 목록 조회: lat=${lat}, lon=${lon}, n=${n}, sortBy=${sortBy}, difficulty=${difficulty}`);
 
-    // 모든 코스 조회
-    let courses = await Course.findAll();
+    // 서비스 계층 호출 (RDB의 findAll 대신 사용)
+    const courses = await getAllCourses({
+      lat: parseFloat(lat),
+      lon: parseFloat(lon),
+      limit: parseInt(n), // n을 limit으로 전달
+      sortBy,
+      difficulty
+    });
 
-    // 난이도 필터링 (선택사항)
-    if (difficulty) {
-      courses = courses.filter((course) => course.course_difficulty === difficulty);
-      logger.info(`난이도 필터링 적용: ${difficulty}, 결과 개수: ${courses.length}`);
-    }
+    res.json(courses);
 
-    // 정렬 기준 적용
-    if (sortBy === 'distance') {
-      // 거리순 정렬 (가까운 순)
-      courses.sort((a, b) => {
-        const distanceA = getDistance(parseFloat(lat), parseFloat(lon), a.start_lat, a.start_lon);
-        const distanceB = getDistance(parseFloat(lat), parseFloat(lon), b.start_lat, b.start_lon);
-        return distanceA - distanceB;
-      });
-      logger.info('거리순 정렬 적용');
-    } else if (sortBy === 'length') {
-      // 길이순 정렬 (긴 순)
-      courses.sort((a, b) => b.course_length - a.course_length);
-      logger.info('길이순 정렬 적용');
-    } else if (sortBy === 'difficulty') {
-      // 난이도순 정렬 (하 → 중 → 상)
-      const difficultyOrder = { 하: 1, 중: 2, 상: 3 };
-      courses.sort((a, b) => difficultyOrder[a.course_difficulty] - difficultyOrder[b.course_difficulty]);
-      logger.info('난이도순 정렬 적용');
-    } else {
-      // 기본: 거리순 정렬
-      courses.sort((a, b) => {
-        const distanceA = getDistance(parseFloat(lat), parseFloat(lon), a.start_lat, a.start_lon);
-        const distanceB = getDistance(parseFloat(lat), parseFloat(lon), b.start_lat, b.start_lon);
-        return distanceA - distanceB;
-      });
-      logger.info('기본 거리순 정렬 적용');
-    }
-
-    // N개로 제한
-    const paginatedCourses = courses.slice(0, parseInt(n));
-
-    logger.info(`코스 목록 조회 완료: ${paginatedCourses.length}개 반환`);
-    res.json(paginatedCourses);
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());
     }
-
     logger.error('코스 목록 조회 오류:', error);
     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
     res.status(500).json(serverError.toJSON());
