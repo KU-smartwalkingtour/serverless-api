@@ -1,58 +1,69 @@
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const { AuthRefreshToken } = require('@models');
 const { logger } = require('@utils/logger');
+const { ServerError, ERROR_CODES } = require('@utils/error');
 
-// 토큰 설정 상수
-const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_BYTES = 64;
-const REFRESH_TOKEN_EXPIRY_DAYS = 7;
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+// ★ DynamoDB 클라이언트 가져오기
+const dynamoDB = require('../config/dynamodb');
+const { GetCommand } = require('@aws-sdk/lib-dynamodb');
 
-/**
- * 필수 환경 변수 검증
- * @throws {Error} JWT_SECRET이 설정되지 않은 경우
- */
-const validateEnvironment = () => {
-  if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET environment variable is not configured');
-  }
+const extractToken = (headers) => {
+  const authHeader = headers['authorization'];
+  if (!authHeader) return null;
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
+  return parts[1];
 };
 
-/**
- * 사용자를 위한 액세스 토큰 및 리프레시 토큰 생성
- * @param {Object} user - id 속성이 있는 사용자 객체
- * @returns {Promise<{accessToken: string, refreshToken: string}>}
- * @throws {Error} JWT_SECRET이 누락되었거나 토큰 생성이 실패한 경우
- */
-const generateTokens = async (user) => {
+const authenticateToken = async (req, res, next) => {
   try {
-    validateEnvironment();
-
-    if (!user || !user.id) {
-      throw new Error('Invalid user object: user.id is required');
+    const token = extractToken(req.headers);
+    if (!token) {
+      throw new ServerError(ERROR_CODES.UNAUTHORIZED, 401);
     }
 
-    const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-      expiresIn: ACCESS_TOKEN_EXPIRY,
-    });
+    // JWT 검증
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const refreshToken = crypto.randomBytes(REFRESH_TOKEN_BYTES).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * MILLISECONDS_PER_DAY);
+    // ★ DynamoDB에서 유저 조회 (USER_TABLE)
+    const params = {
+      TableName: 'USER_TABLE',
+      Key: {
+        user_id: decoded.id,
+        sort_key: 'USER_INFO_ITEM' // 프로필 정보 SK
+      }
+    };
 
-    await AuthRefreshToken.create({
-      user_id: user.id,
-      token_hash: tokenHash,
-      expires_at: expiresAt,
-    });
+    const { Item: user } = await dynamoDB.send(new GetCommand(params));
 
-    logger.debug(`토큰 생성 완료 - 사용자 ID: ${user.id}`);
-    return { accessToken, refreshToken };
-  } catch (error) {
-    logger.error(`토큰 생성 실패: ${error.message}`, { userId: user?.id });
-    throw error;
+    // 유저가 없거나 비활성 상태면 거부
+    if (!user || user.is_active === false) {
+      logger.warn('인증 실패: 사용자를 찾을 수 없거나 비활성 상태', { userId: decoded.id });
+      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 403);
+    }
+
+    // id 필드 맞춰주기 (DynamoDB는 user_id로 저장됨)
+    user.id = user.user_id; 
+    
+    req.user = user;
+    next();
+
+  } catch (err) {
+    if (ServerError.isServerError(err)) {
+      return res.status(err.statusCode).json(err.toJSON());
+    }
+    if (err.name === 'TokenExpiredError') {
+      const error = new ServerError(ERROR_CODES.TOKEN_EXPIRED, 401);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+    if (err.name === 'JsonWebTokenError') {
+      const error = new ServerError(ERROR_CODES.INVALID_TOKEN, 401);
+      return res.status(error.statusCode).json(error.toJSON());
+    }
+    
+    logger.error('JWT 인증 오류', { message: err.message });
+    const error = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+    return res.status(error.statusCode).json(error.toJSON());
   }
 };
 
-module.exports = { generateTokens };
+module.exports = { authenticateToken };
