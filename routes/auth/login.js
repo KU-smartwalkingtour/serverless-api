@@ -151,7 +151,6 @@ router.post('/', validate(loginSchema), async (req, res) => {
     }
 
     logger.error('로그인 중 예상치 못한 오류', { error: error.message });
-    console.log("error is: ", error);
     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
     res.status(500).json(serverError.toJSON());
   }
