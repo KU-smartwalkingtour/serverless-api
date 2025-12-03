@@ -2,11 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
+const { User } = require('@models');
 const { ServerError, ERROR_CODES } = require('@utils/error');
-
-// ★ DynamoDB 모듈
-const dynamoDB = require('../../config/dynamodb');
-const { UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 /**
  * @swagger
@@ -72,82 +69,40 @@ const { UpdateCommand } = require('@aws-sdk/lib-dynamodb');
  */
 router.patch('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const { nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage } = req.body;
+    const { nickname, language, distance_unit, is_dark_mode_enabled, allow_location_storage } =
+      req.body;
+    const user = req.user;
 
-    // 1. 업데이트할 필드가 하나라도 있는지 확인
-    if (nickname === undefined && language === undefined && distance_unit === undefined && 
-        is_dark_mode_enabled === undefined && allow_location_storage === undefined) {
+    // 업데이트할 필드 수집
+    const updates = {};
+    if (nickname !== undefined) updates.nickname = nickname;
+    if (language !== undefined) updates.language = language;
+    if (distance_unit !== undefined) updates.distance_unit = distance_unit;
+    if (is_dark_mode_enabled !== undefined) updates.is_dark_mode_enabled = is_dark_mode_enabled;
+    if (allow_location_storage !== undefined)
+      updates.allow_location_storage = allow_location_storage;
+
+    if (Object.keys(updates).length === 0) {
       throw new ServerError(ERROR_CODES.NO_FIELDS_TO_UPDATE, 400);
     }
 
-    // 2. 동적 UpdateExpression 생성
-    let updateExpression = 'set updated_at = :now';
-    const expressionAttributeNames = {};
-    const expressionAttributeValues = {
-      ':now': new Date().toISOString(),
-    };
+    await user.update(updates);
+    await user.reload();
 
-    if (nickname !== undefined) {
-      updateExpression += ', nickname = :nick';
-      expressionAttributeValues[':nick'] = nickname;
-    }
-    if (language !== undefined) {
-      updateExpression += ', #lang = :lang'; // language는 예약어 충돌 방지를 위해 별칭 사용
-      expressionAttributeNames['#lang'] = 'language';
-      expressionAttributeValues[':lang'] = language;
-    }
-    if (distance_unit !== undefined) {
-      updateExpression += ', distance_unit = :unit';
-      expressionAttributeValues[':unit'] = distance_unit;
-    }
-    if (is_dark_mode_enabled !== undefined) {
-      updateExpression += ', is_dark_mode_enabled = :dark';
-      expressionAttributeValues[':dark'] = is_dark_mode_enabled;
-    }
-    if (allow_location_storage !== undefined) {
-      updateExpression += ', allow_location_storage = :loc';
-      expressionAttributeValues[':loc'] = allow_location_storage;
-    }
-
-    // 3. DynamoDB 업데이트 실행
-    const params = {
-      TableName: 'USER_TABLE',
-      Key: {
-        user_id: userId,
-        sort_key: 'USER_INFO_ITEM',
-      },
-      UpdateExpression: updateExpression,
-      ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-      ExpressionAttributeValues: expressionAttributeValues,
-      ReturnValues: 'ALL_NEW', // 업데이트된 최신 데이터를 반환받음
-      ConditionExpression: 'attribute_exists(user_id)', // 유저가 존재할 때만 수정
-    };
-
-    const result = await dynamoDB.send(new UpdateCommand(params));
-    const updatedUser = result.Attributes;
-
-    logger.info(`사용자 설정 업데이트 완료: ${updatedUser.email}`);
-
+    logger.info(`사용자 설정 업데이트: ${user.email}`);
     res.status(200).json({
-      nickname: updatedUser.nickname,
-      language: updatedUser.language,
-      distance_unit: updatedUser.distance_unit,
-      is_dark_mode_enabled: updatedUser.is_dark_mode_enabled,
-      allow_location_storage: updatedUser.allow_location_storage,
+      nickname: user.nickname,
+      language: user.language,
+      distance_unit: user.distance_unit,
+      is_dark_mode_enabled: user.is_dark_mode_enabled,
+      allow_location_storage: user.allow_location_storage,
     });
-
   } catch (error) {
-    if (error.name === 'ConditionalCheckFailedException') {
-       // 유저가 없는 경우 (토큰은 유효하지만 DB에 데이터가 없는 희귀 케이스)
-       throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
-    }
-
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());
     }
 
-    logger.error(`사용자 설정 업데이트 중 오류: ${error.message}`);
+    logger.error(`사용자 설정 업데이트 중 오류 발생: ${error.message}`);
     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
     res.status(500).json(serverError.toJSON());
   }
