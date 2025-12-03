@@ -119,8 +119,7 @@ try {
 
     const userId = user.user_id;
 
-    // 2. [추가됨] Rate Limiting 체크 (최근 요청 확인)
-    // 해당 유저의 모든 RESET 코드를 가져와서 최신 것과 시간 비교
+    // 2. Rate Limiting 체크 (최근 요청 확인)
     const rateLimitQuery = {
       TableName: 'AUTH_DATA_TABLE',
       KeyConditionExpression: 'user_id = :uid AND begins_with(sort_key, :prefix)',
@@ -133,14 +132,13 @@ try {
     const { Items: resetRequests } = await dynamoDB.send(new QueryCommand(rateLimitQuery));
 
     if (resetRequests && resetRequests.length > 0) {
-      // created_at 기준으로 내림차순 정렬 (최신순)
+      // \최신순 정렬
       resetRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       
       const lastRequest = resetRequests[0];
       const timeDiff = Date.now() - new Date(lastRequest.created_at).getTime();
       const limitMs = RATE_LIMIT_MINUTES * 60 * 1000;
 
-      // 5분(limitMs)이 안 지났으면 에러 발생
       if (timeDiff < limitMs) {
         const waitTimeSeconds = Math.ceil((limitMs - timeDiff) / 1000);
         throw new ServerError(ERROR_CODES.RATE_LIMIT_EXCEEDED, 429, {
@@ -158,22 +156,33 @@ try {
     // 4. 트랜잭션 아이템 구성
     const transactItems = [];
 
-    // 4-1. 이전 미소비 요청 무효화 (consumed=true)
+    // 4-1. 이전 미소비 요청 무효화 (consumed=false인 것들)
     const activeRequests = resetRequests ? resetRequests.filter(r => r.consumed === false) : [];
+    
     if (activeRequests.length > 0) {
       activeRequests.forEach((req) => {
         transactItems.push({
           Update: {
             TableName: 'AUTH_DATA_TABLE',
-            Key: { user_id: userId, sort_key: req.sort_key },
-            UpdateExpression: 'set consumed = :true, updated_at = :now',
-            ExpressionAttributeValues: { ':true': true, ':now': now },
+            Key: {
+              user_id: userId,
+              sort_key: req.sort_key,
+            },
+            // ★ 수정됨: consumed 예약어 회피 (#c 사용)
+            UpdateExpression: 'set #c = :true, updated_at = :now',
+            ExpressionAttributeNames: {
+              '#c': 'consumed' 
+            },
+            ExpressionAttributeValues: {
+              ':true': true,
+              ':now': now,
+            },
           },
         });
       });
     }
 
-    // 4-2. 새 코드 저장
+    // 4-2. 새 인증 코드 저장 (Put) - Put은 예약어 상관없음 (그대로 유지)
     transactItems.push({
       Put: {
         TableName: 'AUTH_DATA_TABLE',
@@ -192,40 +201,24 @@ try {
     // 5. 트랜잭션 실행
     await dynamoDB.send(new TransactWriteCommand({ TransactItems: transactItems }));
 
-    // 6. 이메일 발송
-    logger.info(`[개발용] 비밀번호 재설정 코드 생성됨: ${code}`, { userId });
+// 6. 이메일 발송
     try {
-    //     await sendPasswordResetEmail({ toEmail: user.email, code });
-    //     logger.info('비밀번호 재설정 이메일 전송 성공', { userId });
-    // } catch (emailError) {
-    //     logger.error(`이메일 전송 실패: ${emailError.message}`);
-    // }
         await sendPasswordResetEmail({ toEmail: user.email, code });
         logger.info('이메일 전송 성공', { userId });
     } catch (emailError) {
-      // 이메일 전송 실패해도 로그만 남기고 넘어가기 (테스트를 위해)
-      logger.error(`[AWS SES 전송 실패] 샌드박스 모드이거나 인증되지 않은 이메일입니다: ${emailError.message}`);
+        logger.error(`[AWS SES 전송 실패] ${emailError.message}`);
     }
+    
+    logger.info(`[개발용] 비밀번호 재설정 코드: ${code}`, { userId });
 
     res.status(200).json({ message: '해당 이메일로 비밀번호 재설정 코드가 전송되었습니다.' });
 
   } catch (error) {
-    // 🔍 디버깅용 로그 (에러의 정체를 밝혀라!)
-    console.error("=====================================");
-    console.error("❌ 비밀번호 재설정 에러 상세 내용:");
-    console.error(error); // 에러 객체 전체 출력
-    console.error("=====================================");
-
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());
     }
-    
-    // 에러 메시지를 응답에 포함시켜서 Swagger에서 볼 수 있게 함 (개발 중에만!)
-    res.status(500).json({
-        error: "Internal Server Error",
-        details: error.message, // ★ 여기가 중요
-        stack: error.stack
-    });
+    logger.error('비밀번호 재설정 요청 중 오류', { error: error.message });
+    res.status(500).json(new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500).toJSON());
   }
 });
 
