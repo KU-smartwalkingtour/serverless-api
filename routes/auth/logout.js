@@ -5,7 +5,7 @@ const { authenticateToken } = require('@middleware/auth');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // ★ DynamoDB 모듈
-const dynamoDB = require('../../config/dynamodb');
+const dynamoDB = require('../../config/dynamoDB');
 const { QueryCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 /**

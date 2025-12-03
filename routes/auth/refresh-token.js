@@ -8,7 +8,7 @@ const { validate, refreshTokenSchema } = require('@utils/validation');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // ★ DynamoDB 모듈
-const dynamoDB = require('../../config/dynamodb');
+const dynamoDB = require('../../config/dynamoDB');
 const { QueryCommand, GetCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
 
 /**

@@ -8,7 +8,7 @@ const { authenticateToken } = require('@middleware/auth');
 const z = require('zod');
 
 // ★ DynamoDB 모듈
-const dynamoDB = require('../../config/dynamodb');
+const dynamoDB = require('../../config/dynamoDB');
 const { GetCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 // 상수 정의

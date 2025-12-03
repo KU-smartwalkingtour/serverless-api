@@ -3,7 +3,7 @@ const { logger } = require('@utils/logger');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // ★ DynamoDB 클라이언트 가져오기
-const dynamoDB = require('../config/dynamodb');
+const dynamoDB = require('../config/dynamoDB');
 const { GetCommand } = require('@aws-sdk/lib-dynamodb');
 
 /**

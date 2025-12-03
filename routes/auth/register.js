@@ -9,7 +9,7 @@ const { validate, registerSchema } = require('@utils/validation');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // ★ DynamoDB 관련 모듈 가져오기
-const dynamoDB = require('../../config/dynamodb');
+const dynamoDB = require('../../config/dynamoDB');
 const { QueryCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
 
 // 상수 정의

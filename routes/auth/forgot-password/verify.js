@@ -7,7 +7,7 @@ const z = require('zod');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // ★ DynamoDB 모듈 (경로 확인: ../../../)
-const dynamoDB = require('../../../config/dynamodb');
+const dynamoDB = require('../../../config/dynamoDB');
 const { QueryCommand, TransactWriteCommand } = require('@aws-sdk/lib-dynamodb');
 
 // 상수 정의

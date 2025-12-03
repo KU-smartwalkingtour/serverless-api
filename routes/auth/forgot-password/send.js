@@ -7,7 +7,7 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
 const { sendPasswordResetEmail } = require('@utils/sendEmail');
 
 // ★ DynamoDB 모듈
-const dynamoDB = require('../../../config/dynamodb');
+const dynamoDB = require('../../../config/dynamoDB');
 const { 
   QueryCommand, 
   PutCommand, 

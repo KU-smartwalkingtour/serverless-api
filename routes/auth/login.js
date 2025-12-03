@@ -7,7 +7,7 @@ const { validate, loginSchema } = require('@utils/validation');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 
 // ★ DynamoDB 관련 모듈
-const dynamoDB = require('../../config/dynamodb');
+const dynamoDB = require('../../config/dynamoDB');
 const { QueryCommand, GetCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
 
 /**
