@@ -51,7 +51,7 @@ const generateTokens = async (user) => {
       token_hash: tokenHash,          // GSI 검색용
       created_at: new Date().toISOString(),
       expires_at: expiresAt.toISOString(),
-      revoked_at: null,
+      revoked_at: undefined,
     };
 
     logger.debug(`토큰 생성 완료 - 사용자 ID: ${user.id}`);
