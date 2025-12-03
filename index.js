@@ -73,5 +73,5 @@ const startServer = async () => {
   }
 };
 
-// 서버 시작
+// 서버 시작.
 startServer();
