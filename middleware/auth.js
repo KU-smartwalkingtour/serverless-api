@@ -1,7 +1,10 @@
 const jwt = require('jsonwebtoken');
 const { logger } = require('@utils/logger');
-const { User } = require('@models');
 const { ServerError, ERROR_CODES } = require('@utils/error');
+
+// ★ DynamoDB 클라이언트 가져오기
+const dynamoDB = require('../config/dynamodb');
+const { GetCommand } = require('@aws-sdk/lib-dynamodb');
 
 /**
  * Authorization 헤더에서 Bearer 토큰 추출
@@ -11,10 +14,8 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
 const extractToken = (headers) => {
   const authHeader = headers['authorization'];
   if (!authHeader) return null;
-
   const parts = authHeader.split(' ');
   if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
-
   return parts[1];
 };
 
@@ -32,62 +33,50 @@ const extractToken = (headers) => {
 const authenticateToken = async (req, res, next) => {
   try {
     const token = extractToken(req.headers);
-
-    // 토큰 없음
     if (!token) {
       throw new ServerError(ERROR_CODES.UNAUTHORIZED, 401);
     }
 
-    // JWT 토큰 검증
+    // JWT 검증
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 데이터베이스에서 활성 사용자 조회
-    const user = await User.findOne({
-      where: { id: decoded.id, is_active: true },
-    });
+    // ★ DynamoDB에서 유저 조회 (USER_TABLE)
+    const params = {
+      TableName: 'USER_TABLE',
+      Key: {
+        user_id: decoded.id,
+        sort_key: 'USER_INFO_ITEM' // 프로필 정보 SK
+      }
+    };
 
-    if (!user) {
-      logger.warn('인증 실패: 사용자를 찾을 수 없거나 비활성 상태', {
-        userId: decoded.id,
-        path: req.path,
-      });
+    const { Item: user } = await dynamoDB.send(new GetCommand(params));
+
+    // 유저가 없거나 비활성 상태면 거부
+    if (!user || user.is_active === false) {
+      logger.warn('인증 실패: 사용자를 찾을 수 없거나 비활성 상태', { userId: decoded.id });
       throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 403);
     }
 
-    // 인증 성공: 사용자 객체를 요청에 첨부
+    // id 필드 맞춰주기 (DynamoDB는 user_id로 저장됨)
+    user.id = user.user_id; 
+    
     req.user = user;
     next();
+
   } catch (err) {
-    // ServerError인 경우 그대로 전달
     if (ServerError.isServerError(err)) {
       return res.status(err.statusCode).json(err.toJSON());
     }
-
-    // JWT 에러 타입별 처리
     if (err.name === 'TokenExpiredError') {
-      logger.warn('JWT 토큰 만료', {
-        expiredAt: err.expiredAt,
-        path: req.path,
-      });
       const error = new ServerError(ERROR_CODES.TOKEN_EXPIRED, 401);
       return res.status(error.statusCode).json(error.toJSON());
     }
-
     if (err.name === 'JsonWebTokenError') {
-      logger.warn('JWT 토큰 검증 실패', {
-        message: err.message,
-        path: req.path,
-      });
       const error = new ServerError(ERROR_CODES.INVALID_TOKEN, 401);
       return res.status(error.statusCode).json(error.toJSON());
     }
-
-    // 기타 에러
-    logger.error('JWT 인증 중 예상치 못한 오류', {
-      name: err.name,
-      message: err.message,
-      path: req.path,
-    });
+    
+    logger.error('JWT 인증 오류', { message: err.message });
     const error = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
     return res.status(error.statusCode).json(error.toJSON());
   }
