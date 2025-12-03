@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { logger } = require('@utils/logger');
-const { User } = require('@models');
 const { validate } = require('@utils/validation');
 const { ServerError, ERROR_CODES } = require('@utils/error');
 const { authenticateToken } = require('@middleware/auth');
 const z = require('zod');
+
+// ★ DynamoDB 모듈
+const dynamoDB = require('../../config/dynamodb');
+const { GetCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 // 상수 정의
 const BCRYPT_SALT_ROUNDS = 10;
@@ -80,32 +83,53 @@ router.patch('/', authenticateToken, validate(changePasswordSchema), async (req,
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
 
-    // 사용자 조회
-    const user = await User.findByPk(userId);
-    if (!user) {
-      logger.warn('비밀번호 변경 실패: 사용자를 찾을 수 없음', { userId });
-      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
+    // 1. 현재 비밀번호 해시 가져오기 (AUTH_DATA_TABLE -> PASSWORD_ITEM)
+    const getParams = {
+      TableName: 'AUTH_DATA_TABLE',
+      Key: {
+        user_id: userId,
+        sort_key: 'PASSWORD_ITEM',
+      },
+    };
+
+    const { Item: authData } = await dynamoDB.send(new GetCommand(getParams));
+
+    if (!authData || !authData.password_hash) {
+      // 소셜 로그인 유저 등 비밀번호가 없는 경우 처리
+      logger.warn('비밀번호 변경 실패: 비밀번호 정보를 찾을 수 없음', { userId });
+      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404, '비밀번호 정보를 찾을 수 없습니다.');
     }
 
-    // 현재 비밀번호 확인
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+    // 2. 현재 비밀번호 확인
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, authData.password_hash);
 
     if (!isCurrentPasswordValid) {
       logger.warn('비밀번호 변경 실패: 현재 비밀번호가 일치하지 않음', {
         userId,
-        email: user.email,
       });
       throw new ServerError(ERROR_CODES.INVALID_CREDENTIALS, 401);
     }
 
-    // 새 비밀번호 해싱 및 업데이트
-    const password_hash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
-    await user.update({ password_hash });
+    // 3. 새 비밀번호 해싱
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
 
-    logger.info('비밀번호 변경 완료', {
-      userId,
-      email: user.email,
-    });
+    // 4. 비밀번호 업데이트 (AUTH_DATA_TABLE)
+    const updateParams = {
+      TableName: 'AUTH_DATA_TABLE',
+      Key: {
+        user_id: userId,
+        sort_key: 'PASSWORD_ITEM',
+      },
+      UpdateExpression: 'set password_hash = :hash, updated_at = :now',
+      ExpressionAttributeValues: {
+        ':hash': newPasswordHash,
+        ':now': new Date().toISOString(),
+      },
+    };
+
+    await dynamoDB.send(new UpdateCommand(updateParams));
+
+    logger.info('비밀번호 변경 완료', { userId });
 
     res.status(200).json({ message: '비밀번호가 성공적으로 변경되었습니다.' });
   } catch (error) {

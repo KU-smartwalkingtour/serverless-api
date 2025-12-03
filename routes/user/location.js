@@ -2,9 +2,12 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
-const { UserLocation } = require('@models');
 const { validate, updateLocationSchema } = require('@utils/validation');
 const { ServerError, ERROR_CODES } = require('@utils/error');
+
+// ★ DynamoDB 모듈
+const dynamoDB = require('../../config/dynamodb');
+const { UpdateCommand } = require('@aws-sdk/lib-dynamodb');
 
 /**
  * @swagger
@@ -61,15 +64,30 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
 router.put('/', authenticateToken, validate(updateLocationSchema), async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
+    const userId = req.user.id;
 
-    // 사용자 위치 업데이트 또는 생성
-    await UserLocation.upsert({
-      user_id: req.user.id,
-      latitude,
-      longitude,
-    });
+    // USER_TABLE의 활동 정보(USER_ACTIVITY_ITEM)에 좌표만 부분 수정 (Upsert 효과)
+    // * 주의: PutItem을 쓰면 기존에 있던 stats(걷기 기록)이 날아갈 수 있으므로 UpdateItem 사용
+    const updateParams = {
+      TableName: 'USER_TABLE',
+      Key: {
+        user_id: userId,
+        sort_key: 'USER_ACTIVITY_ITEM', 
+      },
+      UpdateExpression: 'set latitude = :lat, longitude = :lon, updated_at = :now',
+      ExpressionAttributeValues: {
+        ':lat': latitude,
+        ':lon': longitude,
+        ':now': new Date().toISOString(),
+      },
+      // 항목이 없으면 새로 만들고, 있으면 수정함 (Upsert)
+    };
 
+    await dynamoDB.send(new UpdateCommand(updateParams));
+
+    logger.info(`사용자 위치 업데이트 완료: ${userId}`, { latitude, longitude });
     res.status(200).json({ message: '위치가 성공적으로 업데이트되었습니다.' });
+
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());

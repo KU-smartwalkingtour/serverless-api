@@ -1,29 +1,25 @@
+// utils/auth.js
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { AuthRefreshToken } = require('@models');
 const { logger } = require('@utils/logger');
 
 // 토큰 설정 상수
-const ACCESS_TOKEN_EXPIRY = '15m';
+const ACCESS_TOKEN_EXPIRY = '1h'; 
 const REFRESH_TOKEN_BYTES = 64;
-const REFRESH_TOKEN_EXPIRY_DAYS = 7;
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+const REFRESH_TOKEN_DAYS = 14; 
 
-/**
- * 필수 환경 변수 검증
- * @throws {Error} JWT_SECRET이 설정되지 않은 경우
- */
 const validateEnvironment = () => {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET environment variable is not configured');
   }
 };
 
+const hashToken = (token) => {
+  return crypto.createHash('sha256').update(token).digest('hex');
+};
+
 /**
- * 사용자를 위한 액세스 토큰 및 리프레시 토큰 생성
- * @param {Object} user - id 속성이 있는 사용자 객체
- * @returns {Promise<{accessToken: string, refreshToken: string}>}
- * @throws {Error} JWT_SECRET이 누락되었거나 토큰 생성이 실패한 경우
+ * 사용자를 위한 액세스 토큰 및 리프레시 토큰 생성 (DynamoDB용)
  */
 const generateTokens = async (user) => {
   try {
@@ -33,26 +29,40 @@ const generateTokens = async (user) => {
       throw new Error('Invalid user object: user.id is required');
     }
 
-    const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-      expiresIn: ACCESS_TOKEN_EXPIRY,
-    });
+    // 1. 액세스 토큰 생성 (JWT)
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email, nickname: user.nickname },
+      process.env.JWT_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
+    );
 
+    // 2. 리프레시 토큰 생성 (Random String)
     const refreshToken = crypto.randomBytes(REFRESH_TOKEN_BYTES).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * MILLISECONDS_PER_DAY);
+    const tokenHash = hashToken(refreshToken);
 
-    await AuthRefreshToken.create({
-      user_id: user.id,
-      token_hash: tokenHash,
-      expires_at: expiresAt,
-    });
+    // 3. 만료일
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_DAYS);
+
+    // 4. ★ 핵심 변경: DB에 저장하지 않고, 저장할 객체를 만들어서 반환만 함!
+    const refreshTokenPayload = {
+      user_id: user.id,               // PK
+      sort_key: `TOKEN#${tokenHash}`, // SK
+      token_hash: tokenHash,          // GSI 검색용
+      created_at: new Date().toISOString(),
+      expires_at: expiresAt.toISOString(),
+      revoked_at: undefined,
+    };
 
     logger.debug(`토큰 생성 완료 - 사용자 ID: ${user.id}`);
-    return { accessToken, refreshToken };
+    
+    // 액세스 토큰, 리프레시 토큰, 그리고 DynamoDB에 넣을 payload까지 반환
+    return { accessToken, refreshToken, refreshTokenPayload };
+
   } catch (error) {
     logger.error(`토큰 생성 실패: ${error.message}`, { userId: user?.id });
     throw error;
   }
 };
 
-module.exports = { generateTokens };
+module.exports = { generateTokens, hashToken };
