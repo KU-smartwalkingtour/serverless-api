@@ -1,10 +1,54 @@
+// const express = require('express');
+// const router = express.Router();
+// const { Course } = require('@models');
+// const { findNClosestCourses } = require('@utils/course/closest-course');
+// const { logger } = require('@utils/logger');
+// const { authenticateToken } = require('@middleware/auth');
+// const { ServerError, ERROR_CODES } = require('@utils/error');
+// router.get('/', authenticateToken, async (req, res) => {
+//   try {
+//     const { lat, lon, n } = req.query;
+
+//     if (!lat || !lon || !n) {
+//       throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
+//     }
+
+//     const courseIds = await findNClosestCourses(parseFloat(lat), parseFloat(lon), parseInt(n));
+
+//     const courses = await Course.findAll({
+//       where: {
+//         course_id: courseIds,
+//       },
+//     });
+
+//     res.json(courses);
+//   } catch (error) {
+//     if (ServerError.isServerError(error)) {
+//       return res.status(error.statusCode).json(error.toJSON());
+//     }
+
+//     logger.error('가까운 코스 목록 조회 오류:', error);
+//     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
+//     res.status(500).json(serverError.toJSON());
+//   }
+// });
+// module.exports = router;
+
+
+//-----------------------------------------------------------------------------
+// 여기서부터는 Revised to use DynamoDB instead of RDB
 const express = require('express');
 const router = express.Router();
-const { Course } = require('@models');
-const { findNClosestCourses } = require('@utils/course/closest-course');
-const { logger } = require('@utils/logger');
-const { authenticateToken } = require('@middleware/auth');
-const { ServerError, ERROR_CODES } = require('@utils/error');
+const { getAllCourses } = require('../../services/courseService'); // DynamoDB Service
+const { logger } = require('../../utils/logger');
+const { authenticateToken } = require('../../middleware/auth');
+const { ServerError, ERROR_CODES } = require('../../utils/error');
+
+/**
+ * /courses/home:
+ * get:
+ * summary: 홈 화면 가까운 코스 조회 (DynamoDB)
+ */
 
 /**
  * @swagger
@@ -61,6 +105,7 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
+
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { lat, lon, n } = req.query;
@@ -69,21 +114,26 @@ router.get('/', authenticateToken, async (req, res) => {
       throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
     }
 
-    const courseIds = await findNClosestCourses(parseFloat(lat), parseFloat(lon), parseInt(n));
-
-    const courses = await Course.findAll({
-      where: {
-        course_id: courseIds,
-      },
+    // 서비스 호출 (정렬 기준은 거리순이 기본)
+    const courses = await getAllCourses({
+      lat: parseFloat(lat),
+      lon: parseFloat(lon),
+      limit: parseInt(n),
+      sortBy: 'distance'
     });
 
     res.json(courses);
+
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());
     }
 
-    logger.error('가까운 코스 목록 조회 오류:', error);
+    console.error("================ 에러 상세 로그 시작 ================");
+    console.error(error); 
+    console.error("================ 에러 상세 로그 끝 ================");
+    
+    logger.error('홈 코스 목록 조회 오류:', error);
     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
     res.status(500).json(serverError.toJSON());
   }
