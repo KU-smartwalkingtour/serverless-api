@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('@middleware/auth');
 const { logger } = require('@utils/logger');
-const { validate, updateProfileSchema } = require('@utils/validation');
-const { User, AuthRefreshToken, UserSavedCourse, UserRecentCourse } = require('@models');
 const { ServerError, ERROR_CODES } = require('@utils/error');
+
+// ★ DynamoDB 모듈 (경로: ../../)
+const dynamoDB = require('../../config/dynamodb');
+const { GetCommand, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 
 /**
  * @swagger
@@ -53,32 +55,65 @@ const { ServerError, ERROR_CODES } = require('@utils/error');
  */
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id);
-    if (!user) {
+    // middleware/auth.js에서 user_id를 매핑해줬으므로 req.user.id 사용 가능
+    const userId = req.user.id;
+
+    // 1. 기본 프로필 정보 가져오기 (USER_TABLE)
+    const userParams = {
+      TableName: 'USER_TABLE',
+      Key: {
+        user_id: userId,
+        sort_key: 'USER_INFO_ITEM',
+      },
+    };
+
+    const userResult = await dynamoDB.send(new GetCommand(userParams));
+    
+    if (!userResult.Item) {
       throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
     }
 
-    const saved_courses_count = await UserSavedCourse.count({ where: { user_id: req.user.id } });
-    const recent_courses_count = await UserRecentCourse.count({ where: { user_id: req.user.id } });
+    const user = userResult.Item;
 
-    const {
-      email,
-      nickname,
-      language,
-      distance_unit,
-      is_dark_mode_enabled,
-      allow_location_storage,
-    } = user;
+    // 2. 저장된 코스 개수 카운트 (USER_COURSE_TABLE -> SAVED#)
+    const savedCoursesParams = {
+      TableName: 'USER_COURSE_TABLE',
+      KeyConditionExpression: 'user_id = :uid AND begins_with(sort_key, :sk)',
+      ExpressionAttributeValues: {
+        ':uid': userId,
+        ':sk': 'SAVED#',
+      },
+      Select: 'COUNT', // 데이터 대신 개수만 가져옴 (비용 절약)
+    };
+    
+    // 3. 최근 본 코스 개수 카운트 (USER_COURSE_TABLE -> RECENT#)
+    const recentCoursesParams = {
+      TableName: 'USER_COURSE_TABLE',
+      KeyConditionExpression: 'user_id = :uid AND begins_with(sort_key, :sk)',
+      ExpressionAttributeValues: {
+        ':uid': userId,
+        ':sk': 'RECENT#', 
+      },
+      Select: 'COUNT',
+    };
+
+    // 병렬로 요청하여 속도 향상
+    const [savedCountResult, recentCountResult] = await Promise.all([
+        dynamoDB.send(new QueryCommand(savedCoursesParams)),
+        dynamoDB.send(new QueryCommand(recentCoursesParams))
+    ]);
+
     res.json({
-      email,
-      nickname,
-      language,
-      distance_unit,
-      is_dark_mode_enabled,
-      allow_location_storage,
-      saved_courses_count,
-      recent_courses_count,
+      email: user.email,
+      nickname: user.nickname,
+      language: user.language || 'ko',
+      distance_unit: user.distance_unit || 'km',
+      is_dark_mode_enabled: user.is_dark_mode_enabled || false,
+      allow_location_storage: user.allow_location_storage || false,
+      saved_courses_count: savedCountResult.Count || 0,
+      recent_courses_count: recentCountResult.Count || 0,
     });
+
   } catch (error) {
     if (ServerError.isServerError(error)) {
       return res.status(error.statusCode).json(error.toJSON());
