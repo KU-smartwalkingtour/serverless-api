@@ -1,15 +1,6 @@
 const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
 require('dotenv').config();
 
-// 1) SES 클라이언트 생성
-const sesClient = new SESv2Client({
-  region: 'ap-northeast-2',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
-
 /**
  * SESv2 SDK를 이용하여 메일을 발송합니다.
  * @param {{ toEmail: string, code: string }} params - toEmail은 메일을 보낼 주소, code는 인증 코드(6자리)
