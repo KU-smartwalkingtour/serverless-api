@@ -117,9 +117,10 @@ async function sendPasswordResetEmail({ toEmail, code }) {
 </body>
 </html>
   `.trim();
+  const SENDER_EMAIL = 'no-reply@ku-smartwalkingtour.site';
 
   const command = new SendEmailCommand({
-    FromEmailAddress: 'no-reply@ku-smartwalkingtour.site',
+    FromEmailAddress: SENDER_EMAIL,
     Destination: {
       ToAddresses: [toEmail],
     },
