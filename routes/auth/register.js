@@ -192,6 +192,7 @@ router.post('/', validate(registerSchema), async (req, res) => {
     }
 
     logger.error('회원가입 중 예상치 못한 오류', { error: error.message });
+    console.log(error);
     const serverError = new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500);
     res.status(500).json(serverError.toJSON());
   }
