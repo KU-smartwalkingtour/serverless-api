@@ -15,81 +15,20 @@ export default $config({
   },
   async run() {
     // ==========================================================================
-    // DynamoDB Tables
+    // DynamoDB Tables (기존 테이블 참조)
     // ==========================================================================
-    const userTable = new sst.aws.Dynamo("UserTable", {
-      fields: {
-        user_id: "string",
-        sort_key: "string",
-        email: "string",
-      },
-      primaryIndex: { hashKey: "user_id", rangeKey: "sort_key" },
-      globalIndexes: {
-        EmailIndex: { hashKey: "email" },
-      },
-      transform: {
-        table: {
-          name: "USER_TABLE",
-        },
-      },
-    });
-
-    const authDataTable = new sst.aws.Dynamo("AuthDataTable", {
-      fields: {
-        user_id: "string",
-        sort_key: "string",
-        token_hash: "string",
-      },
-      primaryIndex: { hashKey: "user_id", rangeKey: "sort_key" },
-      globalIndexes: {
-        TokenHashIndex: { hashKey: "token_hash" },
-      },
-      transform: {
-        table: {
-          name: "AUTH_DATA_TABLE",
-        },
-      },
-    });
-
-    const courseDataTable = new sst.aws.Dynamo("CourseDataTable", {
-      fields: {
-        course_id: "string",
-      },
-      primaryIndex: { hashKey: "course_id" },
-      transform: {
-        table: {
-          name: "COURSE_DATA_TABLE",
-        },
-      },
-    });
-
-    const userCourseTable = new sst.aws.Dynamo("UserCourseTable", {
-      fields: {
-        user_id: "string",
-        sort_key: "string",
-        saved_at: "string",
-        updated_at: "string",
-      },
-      primaryIndex: { hashKey: "user_id", rangeKey: "sort_key" },
-      globalIndexes: {
-        usercourse_saved_at_index: { hashKey: "user_id", rangeKey: "saved_at" },
-        usercourse_updated_at_index: { hashKey: "user_id", rangeKey: "updated_at" },
-      },
-      transform: {
-        table: {
-          name: "USER_COURSE_TABLE",
-        },
-      },
-    });
+    const dynamoDbArns = {
+      userTable: "arn:aws:dynamodb:ap-northeast-2:*:table/USER_TABLE",
+      authDataTable: "arn:aws:dynamodb:ap-northeast-2:*:table/AUTH_DATA_TABLE",
+      courseDataTable: "arn:aws:dynamodb:ap-northeast-2:*:table/COURSE_DATA_TABLE",
+      userCourseTable: "arn:aws:dynamodb:ap-northeast-2:*:table/USER_COURSE_TABLE",
+    };
 
     // ==========================================================================
-    // Lambda Layer (using Pulumi aws provider)
+    // Lambda Layer (pre-uploaded to AWS)
+    // 수동 업로드: aws lambda publish-layer-version --layer-name ku-swt-common-layer ...
     // ==========================================================================
-    const commonLayer = new aws.lambda.LayerVersion("CommonLayer", {
-      layerName: "ku-swt-common-layer",
-      compatibleRuntimes: ["nodejs20.x"],
-      code: new $util.asset.FileArchive("src/layers/common"),
-    });
+    const commonLayerArn = "arn:aws:lambda:ap-northeast-2:676206945897:layer:ku-swt-common-layer:3";
 
     // ==========================================================================
     // Environment Variables
@@ -127,6 +66,21 @@ export default $config({
     };
 
     // ==========================================================================
+    // Lambda Function Common Settings (for Layer external modules)
+    // ==========================================================================
+    const nodejsConfig = {
+      format: "cjs" as const,
+      esbuild: {
+        external: [
+          "/opt/nodejs/utils/*",
+          "/opt/nodejs/services/*",
+          "/opt/nodejs/config/*",
+          "/opt/nodejs/models/*",
+        ],
+      },
+    };
+
+    // ==========================================================================
     // DynamoDB Access Permission
     // ==========================================================================
     const dynamoDbPermissions = {
@@ -141,14 +95,14 @@ export default $config({
         "dynamodb:BatchWriteItem",
       ],
       resources: [
-        userTable.arn,
-        authDataTable.arn,
-        courseDataTable.arn,
-        userCourseTable.arn,
-        $interpolate`${userTable.arn}/index/*`,
-        $interpolate`${authDataTable.arn}/index/*`,
-        $interpolate`${courseDataTable.arn}/index/*`,
-        $interpolate`${userCourseTable.arn}/index/*`,
+        dynamoDbArns.userTable,
+        dynamoDbArns.authDataTable,
+        dynamoDbArns.courseDataTable,
+        dynamoDbArns.userCourseTable,
+        `${dynamoDbArns.userTable}/index/*`,
+        `${dynamoDbArns.authDataTable}/index/*`,
+        `${dynamoDbArns.courseDataTable}/index/*`,
+        `${dynamoDbArns.userCourseTable}/index/*`,
       ],
     };
 
@@ -169,13 +123,14 @@ export default $config({
       lambda: {
         function: {
           handler: "src/functions/authorizer/index.handler",
-          layers: [commonLayer.arn],
+          layers: [commonLayerArn],
           memory: "128 MB",
           timeout: "5 seconds",
           permissions: [dynamoDbPermissions],
           environment: {
             JWT_SECRET: process.env.JWT_SECRET!,
           },
+          nodejs: nodejsConfig,
         },
       },
     });
@@ -185,47 +140,52 @@ export default $config({
     // ==========================================================================
     api.route("POST /auth/register", {
       handler: "src/functions/auth/register/index.handler",
-      layers: [commonLayer.arn],
+      layers: [commonLayerArn],
       memory: "256 MB",
       timeout: "10 seconds",
       permissions: [dynamoDbPermissions],
       environment: authEnv,
+      nodejs: nodejsConfig,
     });
 
     api.route("POST /auth/login", {
       handler: "src/functions/auth/login/index.handler",
-      layers: [commonLayer.arn],
+      layers: [commonLayerArn],
       memory: "256 MB",
       timeout: "10 seconds",
       permissions: [dynamoDbPermissions],
       environment: authEnv,
+      nodejs: nodejsConfig,
     });
 
     api.route("POST /auth/refresh-token", {
       handler: "src/functions/auth/refresh-token/index.handler",
-      layers: [commonLayer.arn],
+      layers: [commonLayerArn],
       memory: "256 MB",
       timeout: "10 seconds",
       permissions: [dynamoDbPermissions],
       environment: authEnv,
+      nodejs: nodejsConfig,
     });
 
     api.route("POST /auth/forgot-password/send", {
       handler: "src/functions/auth/forgot-password-send/index.handler",
-      layers: [commonLayer.arn],
+      layers: [commonLayerArn],
       memory: "256 MB",
       timeout: "10 seconds",
       permissions: [dynamoDbPermissions],
       environment: authEnv,
+      nodejs: nodejsConfig,
     });
 
     api.route("POST /auth/forgot-password/verify", {
       handler: "src/functions/auth/forgot-password-verify/index.handler",
-      layers: [commonLayer.arn],
+      layers: [commonLayerArn],
       memory: "256 MB",
       timeout: "10 seconds",
       permissions: [dynamoDbPermissions],
       environment: authEnv,
+      nodejs: nodejsConfig,
     });
 
     // ==========================================================================
@@ -235,11 +195,12 @@ export default $config({
       "POST /auth/logout",
       {
         handler: "src/functions/auth/logout/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -255,11 +216,12 @@ export default $config({
       "GET /weather",
       {
         handler: "src/functions/weather/integrated/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "15 seconds",
         permissions: [dynamoDbPermissions],
         environment: weatherEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -272,11 +234,12 @@ export default $config({
       "GET /weather/summary",
       {
         handler: "src/functions/weather/summary/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "15 seconds",
         permissions: [dynamoDbPermissions],
         environment: weatherEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -286,14 +249,15 @@ export default $config({
     );
 
     api.route(
-      "GET /weather/air-quality",
+      "GET /weather/airquality",
       {
         handler: "src/functions/weather/airquality/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "15 seconds",
         permissions: [dynamoDbPermissions],
         environment: weatherEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -309,11 +273,12 @@ export default $config({
       "GET /courses/home",
       {
         handler: "src/functions/courses/home/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: coursesEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -326,11 +291,12 @@ export default $config({
       "GET /courses/course",
       {
         handler: "src/functions/courses/list/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: coursesEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -343,11 +309,12 @@ export default $config({
       "GET /courses/{courseId}",
       {
         handler: "src/functions/courses/detail/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: coursesEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -360,11 +327,12 @@ export default $config({
       "GET /courses/{courseId}/coordinates",
       {
         handler: "src/functions/courses/coordinates/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: coursesEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -380,11 +348,12 @@ export default $config({
       "GET /user/profile",
       {
         handler: "src/functions/user/profile/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -397,11 +366,12 @@ export default $config({
       "PATCH /user/settings",
       {
         handler: "src/functions/user/settings/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -414,11 +384,12 @@ export default $config({
       "PATCH /user/password",
       {
         handler: "src/functions/user/password/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -431,11 +402,12 @@ export default $config({
       "DELETE /user/withdraw",
       {
         handler: "src/functions/user/withdraw/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -451,11 +423,12 @@ export default $config({
       "PUT /user/coordinates",
       {
         handler: "src/functions/user/coordinates/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -468,11 +441,12 @@ export default $config({
       "GET /user/stats",
       {
         handler: "src/functions/user/stats/get/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -485,11 +459,12 @@ export default $config({
       "POST /user/stats/walk",
       {
         handler: "src/functions/user/stats/walk/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -505,11 +480,12 @@ export default $config({
       "GET /user/courses/saved-courses",
       {
         handler: "src/functions/user/saved-courses/get/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -522,11 +498,12 @@ export default $config({
       "PUT /user/courses/saved-courses/{courseId}",
       {
         handler: "src/functions/user/saved-courses/save/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -539,11 +516,12 @@ export default $config({
       "DELETE /user/courses/saved-courses/{courseId}",
       {
         handler: "src/functions/user/saved-courses/delete/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -559,11 +537,12 @@ export default $config({
       "GET /user/courses/recent-courses",
       {
         handler: "src/functions/user/recent-courses/get/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -576,11 +555,12 @@ export default $config({
       "PUT /user/courses/recent-courses/{courseId}",
       {
         handler: "src/functions/user/recent-courses/add/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -593,11 +573,12 @@ export default $config({
       "DELETE /user/courses/recent-courses/{courseId}",
       {
         handler: "src/functions/user/recent-courses/delete/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
         permissions: [dynamoDbPermissions],
         environment: authEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -613,11 +594,12 @@ export default $config({
       "GET /medical/search",
       {
         handler: "src/functions/medical/search/index.handler",
-        layers: [commonLayer.arn],
+        layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "15 seconds",
         permissions: [dynamoDbPermissions],
         environment: medicalEnv,
+        nodejs: nodejsConfig,
       },
       {
         auth: {
@@ -631,9 +613,27 @@ export default $config({
     // ==========================================================================
     api.route("GET /health", {
       handler: "src/functions/health/index.handler",
-      layers: [commonLayer.arn],
+      layers: [commonLayerArn],
       memory: "128 MB",
       timeout: "5 seconds",
+      nodejs: nodejsConfig,
+    });
+
+    // ==========================================================================
+    // API Documentation (No Auth Required)
+    // ==========================================================================
+    api.route("GET /api-docs", {
+      handler: "src/functions/docs/index.handler",
+      memory: "128 MB",
+      timeout: "5 seconds",
+      nodejs: nodejsConfig,
+    });
+
+    api.route("GET /api-docs/json", {
+      handler: "src/functions/docs/json.handler",
+      memory: "128 MB",
+      timeout: "5 seconds",
+      nodejs: nodejsConfig,
     });
 
     // ==========================================================================

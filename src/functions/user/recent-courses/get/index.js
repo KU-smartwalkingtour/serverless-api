@@ -4,7 +4,7 @@ const { ServerError, ERROR_CODES } = require('/opt/nodejs/utils/error');
 const { getRecentCourses } = require('/opt/nodejs/services/userService');
 
 exports.handler = async (event) => {
-  const userId = event.requestContext?.authorizer?.userId;
+  const userId = event.requestContext?.authorizer?.lambda?.userId;
 
   if (!userId) {
     return error(new ServerError(ERROR_CODES.UNAUTHORIZED, 401));

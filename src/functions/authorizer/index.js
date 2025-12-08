@@ -3,6 +3,10 @@ const { GetCommand } = require('@aws-sdk/lib-dynamodb');
 const { docClient, TABLES } = require('/opt/nodejs/config/dynamodb');
 const { logger } = require('/opt/nodejs/utils/logger');
 
+/**
+ * Lambda Authorizer for HTTP API v2 with Simple Response format
+ * Returns: { isAuthorized: boolean, context: { ... } }
+ */
 exports.handler = async (event) => {
   logger.info('Authorizer invoked', { routeArn: event.routeArn });
 
@@ -10,7 +14,7 @@ exports.handler = async (event) => {
     const token = extractToken(event.headers);
     if (!token) {
       logger.warn('No token provided');
-      return generatePolicy('anonymous', 'Deny', event.routeArn);
+      return { isAuthorized: false };
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -27,15 +31,18 @@ exports.handler = async (event) => {
 
     if (!user || user.is_active === false) {
       logger.warn('User not found or inactive', { userId: decoded.id });
-      return generatePolicy(decoded.id, 'Deny', event.routeArn);
+      return { isAuthorized: false };
     }
 
     logger.info('Authorization successful', { userId: decoded.id });
-    return generatePolicy(decoded.id, 'Allow', event.routeArn, {
-      userId: decoded.id,
-      email: user.email,
-      nickname: user.nickname,
-    });
+    return {
+      isAuthorized: true,
+      context: {
+        userId: decoded.id,
+        email: user.email,
+        nickname: user.nickname,
+      },
+    };
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       logger.warn('Token expired');
@@ -44,7 +51,7 @@ exports.handler = async (event) => {
     } else {
       logger.error('Authorizer error', { error: err.message });
     }
-    return generatePolicy('anonymous', 'Deny', event.routeArn);
+    return { isAuthorized: false };
   }
 };
 
@@ -54,26 +61,4 @@ function extractToken(headers) {
   const parts = authHeader.split(' ');
   if (parts.length !== 2 || parts[0] !== 'Bearer') return null;
   return parts[1];
-}
-
-function generatePolicy(principalId, effect, resource, context = {}) {
-  const policy = {
-    principalId,
-    policyDocument: {
-      Version: '2012-10-17',
-      Statement: [
-        {
-          Action: 'execute-api:Invoke',
-          Effect: effect,
-          Resource: resource,
-        },
-      ],
-    },
-  };
-
-  if (Object.keys(context).length > 0) {
-    policy.context = context;
-  }
-
-  return policy;
 }

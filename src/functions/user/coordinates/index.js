@@ -5,7 +5,7 @@ const { validateBody, updateLocationSchema } = require('/opt/nodejs/utils/valida
 const { updateCoordinates } = require('/opt/nodejs/services/userService');
 
 exports.handler = async (event) => {
-  const userId = event.requestContext?.authorizer?.userId;
+  const userId = event.requestContext?.authorizer?.lambda?.userId;
 
   if (!userId) {
     return error(new ServerError(ERROR_CODES.UNAUTHORIZED, 401));

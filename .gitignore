@@ -1,5 +1,10 @@
 # Dependencies
 /node_modules
+src/layers/common/nodejs/node_modules
+src/layers/common/nodejs/yarn.lock
+
+# Lambda layer zip
+src/layers/common-layer.zip
 
 # Build output
 /dist

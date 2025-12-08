@@ -5,7 +5,7 @@ const { getCoordinates } = require('/opt/nodejs/services/coursesService');
 
 exports.handler = async (event) => {
   const courseId = event.pathParameters?.courseId;
-  const userId = event.requestContext?.authorizer?.userId;
+  const userId = event.requestContext?.authorizer?.lambda?.userId;
 
   logger.info('Courses coordinates request', { courseId });
 
