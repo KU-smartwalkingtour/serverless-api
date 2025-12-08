@@ -423,6 +423,68 @@ async function deleteRecentCourse(userId, courseId) {
   }
 }
 
+async function updateCoordinates(userId, latitude, longitude) {
+  const now = new Date().toISOString();
+
+  await docClient.send(
+    new UpdateCommand({
+      TableName: TABLES.USER,
+      Key: { user_id: userId, sort_key: 'USER_ACTIVITY_ITEM' },
+      UpdateExpression: 'set latitude = :lat, longitude = :lon, updated_at = :now',
+      ExpressionAttributeValues: {
+        ':lat': latitude,
+        ':lon': longitude,
+        ':now': now,
+      },
+    })
+  );
+
+  logger.info('User coordinates updated', { userId, latitude, longitude });
+  return { message: '위치가 성공적으로 업데이트되었습니다.' };
+}
+
+async function getStats(userId) {
+  const { Item } = await docClient.send(
+    new GetCommand({
+      TableName: TABLES.USER,
+      Key: { user_id: userId, sort_key: 'USER_ACTIVITY_ITEM' },
+    })
+  );
+
+  const stats = Item || { user_id: userId, total_walk_distance_km: 0 };
+
+  return {
+    user_id: stats.user_id,
+    total_walk_distance_km: stats.total_walk_distance_km || 0,
+    updated_at: stats.updated_at || null,
+  };
+}
+
+async function logWalk(userId, distanceKm) {
+  const result = await docClient.send(
+    new UpdateCommand({
+      TableName: TABLES.USER,
+      Key: { user_id: userId, sort_key: 'USER_ACTIVITY_ITEM' },
+      UpdateExpression:
+        'set total_walk_distance_km = if_not_exists(total_walk_distance_km, :zero) + :val, updated_at = :now',
+      ExpressionAttributeValues: {
+        ':val': parseFloat(distanceKm),
+        ':zero': 0,
+        ':now': new Date().toISOString(),
+      },
+      ReturnValues: 'UPDATED_NEW',
+    })
+  );
+
+  const newTotal = result.Attributes.total_walk_distance_km;
+  logger.info('Walk distance logged', { userId, distanceKm, newTotal });
+
+  return {
+    message: '걷기 거리가 성공적으로 기록되었습니다.',
+    new_total: newTotal,
+  };
+}
+
 module.exports = {
   getProfile,
   withdraw,
@@ -434,4 +496,7 @@ module.exports = {
   getRecentCourses,
   addRecentCourse,
   deleteRecentCourse,
+  updateCoordinates,
+  getStats,
+  logWalk,
 };
