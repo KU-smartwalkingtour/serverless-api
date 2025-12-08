@@ -4,6 +4,9 @@
 # Build output
 /dist
 
+# SST
+.sst/
+
 # gpx file directory
 gpx_files
 

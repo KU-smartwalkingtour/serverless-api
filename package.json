@@ -1,14 +1,18 @@
 {
-  "name": "today_weather_summary",
+  "name": "ku-swt",
   "version": "1.0.0",
-  "description": "",
+  "description": "KU Smart Walking Tour Serverless API",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "dev": "nodemon",
+    "dev": "sst dev",
+    "deploy": "sst deploy --stage production",
+    "deploy:dev": "sst deploy --stage dev",
+    "destroy": "sst remove --stage production",
+    "destroy:dev": "sst remove --stage dev",
     "build": "node build.js",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist .sst",
     "docker:build": "docker build --no-cache -t cloudwebservice-server:optimized .",
     "format": "prettier --write ."
   },
@@ -48,7 +52,9 @@
     "esbuild": "^0.24.0",
     "javascript-obfuscator": "^4.1.1",
     "nodemon": "^3.1.10",
-    "prettier": "^3.6.2"
+    "prettier": "^3.6.2",
+    "sst": "^3.0.0",
+    "typescript": "^5.0.0"
   },
   "_moduleAliases": {
     "@models": "./models",

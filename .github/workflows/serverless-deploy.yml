@@ -1,0 +1,127 @@
+name: Deploy Serverless API
+
+on:
+  push:
+    branches:
+      - deploy/sst
+  pull_request:
+    branches:
+      - deploy/sst
+
+env:
+  AWS_REGION: ap-northeast-2
+  NODE_VERSION: 20
+
+jobs:
+  deploy:
+    name: Deploy with SST
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Install Layer dependencies
+        run: |
+          cd src/layers/common/nodejs
+          yarn install --production --frozen-lockfile
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to AWS (Preview)
+        if: github.event_name == 'pull_request'
+        run: npx sst deploy --stage preview
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
+          DURUNUBI_SERVICE_KEY: ${{ secrets.DURUNUBI_SERVICE_KEY }}
+          SEOUL_TRAIL_API_KEY: ${{ secrets.SEOUL_TRAIL_API_KEY }}
+          NMC_HOSPITAL_KEY: ${{ secrets.NMC_HOSPITAL_KEY }}
+
+      - name: Deploy to AWS (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/deploy/sst'
+        run: npx sst deploy --stage production
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
+          DURUNUBI_SERVICE_KEY: ${{ secrets.DURUNUBI_SERVICE_KEY }}
+          SEOUL_TRAIL_API_KEY: ${{ secrets.SEOUL_TRAIL_API_KEY }}
+          NMC_HOSPITAL_KEY: ${{ secrets.NMC_HOSPITAL_KEY }}
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### SST Deployment Preview
+
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*
+
+            Preview deployment has been created. Check the Actions tab for the API URL.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Deployment Summary
+        if: github.event_name == 'push'
+        run: |
+          echo "## Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** production" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  remove-preview:
+    name: Remove Preview Environment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Remove Preview Environment
+        run: npx sst remove --stage preview

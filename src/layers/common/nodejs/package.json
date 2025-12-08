@@ -1,0 +1,24 @@
+{
+  "name": "common-layer",
+  "version": "1.0.0",
+  "description": "Common Lambda Layer - models, utils, config, services",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.940.0",
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@aws-sdk/client-sesv2": "^3.917.0",
+    "@aws-sdk/lib-dynamodb": "^3.940.0",
+    "axios": "^1.12.2",
+    "bcryptjs": "^3.0.2",
+    "gpx-parse": "^0.1.7",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3",
+    "pg-hstore": "^2.3.4",
+    "pino": "^10.1.0",
+    "proj4": "^2.19.10",
+    "sequelize": "^6.37.7",
+    "uuid": "^11.1.0",
+    "xml2js": "^0.6.2",
+    "zod": "^4.1.12"
+  }
+}
