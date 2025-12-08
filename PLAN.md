@@ -256,7 +256,7 @@ serverless-api/
 │
 ├── .github/
 │   └── workflows/
-│       └── serverless-deploy.yml  # SST CI/CD
+│       └── deploy.yml  # SST CI/CD
 │
 └── (기존 Express 코드 - 마이그레이션 완료 후 삭제)
     ├── app.js
@@ -331,7 +331,7 @@ export default $config({
 
 ## GitHub Actions CI/CD
 
-### .github/workflows/serverless-deploy.yml
+### .github/workflows/deploy.yml
 
 ```yaml
 name: Deploy Serverless API
@@ -339,23 +339,23 @@ name: Deploy Serverless API
 on:
   push:
     branches:
-      - deploy/prod
-  pull_request:
-    branches:
-      - deploy/prod
+      - deploy/sst
 
 env:
   AWS_REGION: ap-northeast-2
+  NODE_VERSION: 20
 
 jobs:
   deploy:
+    name: Deploy with SST
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'yarn'
 
       - name: Install dependencies
@@ -366,11 +366,16 @@ jobs:
           cd src/layers/common/nodejs
           yarn install --production --frozen-lockfile
 
-      - name: Deploy with SST
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to AWS (Production)
         run: npx sst deploy --stage production
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
@@ -425,12 +430,12 @@ jobs:
 - [x] `sst dev`로 로컬 테스트
 - [x] 기존 API와 응답 비교 테스트
 - [x] 개발 테스트 서버 배포 (https://gspl0i5f44.execute-api.ap-northeast-2.amazonaws.com)
-- [ ] 프로덕션 배포
+- [x] 프로덕션 배포
 
 ### Phase 6: 마이그레이션 완료
 
-- [ ] 기존 Express 코드 정리
-- [ ] CloudWatch 알람 설정
+- [x] 기존 Express 코드 정리 (app.js, index.js, lambda.js, Dockerfile, .dockerignore, build.js, routes/, middleware/, config/, models/, services/, utils/ 삭제)
+- [x] CloudWatch 알람 설정 (5xx, 4xx 에러 및 latency 알람 - 프로덕션 전용)
 - [ ] 기존 EC2 인프라 정리
 
 ---

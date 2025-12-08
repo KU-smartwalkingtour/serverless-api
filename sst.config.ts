@@ -637,6 +637,65 @@ export default $config({
     });
 
     // ==========================================================================
+    // CloudWatch Alarms (Production Only)
+    // ==========================================================================
+    if ($app.stage === "production") {
+      // SNS Topic for alarm notifications
+      const alarmTopic = new sst.aws.SnsTopic("AlarmTopic");
+
+      // API Gateway 5xx Error Alarm
+      new aws.cloudwatch.MetricAlarm("Api5xxAlarm", {
+        alarmName: "ku-swt-api-5xx-errors",
+        comparisonOperator: "GreaterThanThreshold",
+        evaluationPeriods: 1,
+        metricName: "5XXError",
+        namespace: "AWS/ApiGateway",
+        period: 300,
+        statistic: "Sum",
+        threshold: 10,
+        alarmDescription: "API Gateway 5xx errors exceeded threshold",
+        dimensions: {
+          ApiId: api.nodes.api.id,
+        },
+        alarmActions: [alarmTopic.arn],
+      });
+
+      // API Gateway 4xx Error Alarm
+      new aws.cloudwatch.MetricAlarm("Api4xxAlarm", {
+        alarmName: "ku-swt-api-4xx-errors",
+        comparisonOperator: "GreaterThanThreshold",
+        evaluationPeriods: 1,
+        metricName: "4XXError",
+        namespace: "AWS/ApiGateway",
+        period: 300,
+        statistic: "Sum",
+        threshold: 100,
+        alarmDescription: "API Gateway 4xx errors exceeded threshold",
+        dimensions: {
+          ApiId: api.nodes.api.id,
+        },
+        alarmActions: [alarmTopic.arn],
+      });
+
+      // API Gateway Latency Alarm
+      new aws.cloudwatch.MetricAlarm("ApiLatencyAlarm", {
+        alarmName: "ku-swt-api-high-latency",
+        comparisonOperator: "GreaterThanThreshold",
+        evaluationPeriods: 2,
+        metricName: "Latency",
+        namespace: "AWS/ApiGateway",
+        period: 300,
+        statistic: "Average",
+        threshold: 3000,
+        alarmDescription: "API Gateway average latency exceeded 3 seconds",
+        dimensions: {
+          ApiId: api.nodes.api.id,
+        },
+        alarmActions: [alarmTopic.arn],
+      });
+    }
+
+    // ==========================================================================
     // Outputs
     // ==========================================================================
     return {
