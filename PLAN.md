@@ -164,7 +164,7 @@ src/layers/common/nodejs/
 | POST | /auth/forgot-password/verify | auth/forgot-password-verify | - |
 | GET | /weather | weather/integrated | JWT |
 | GET | /weather/summary | weather/summary | JWT |
-| GET | /weather/air-quality | weather/airquality | JWT |
+| GET | /weather/airquality | weather/airquality | JWT |
 | GET | /courses/home | courses/home | JWT |
 | GET | /courses/course | courses/list | JWT |
 | GET | /courses/{courseId} | courses/detail | JWT |
@@ -422,8 +422,9 @@ jobs:
 
 ### Phase 5: 테스트 및 검증
 
-- [ ] `sst dev`로 로컬 테스트
-- [ ] 기존 API와 응답 비교 테스트
+- [x] `sst dev`로 로컬 테스트
+- [x] 기존 API와 응답 비교 테스트
+- [x] 개발 테스트 서버 배포 (https://gspl0i5f44.execute-api.ap-northeast-2.amazonaws.com)
 - [ ] 프로덕션 배포
 
 ### Phase 6: 마이그레이션 완료
