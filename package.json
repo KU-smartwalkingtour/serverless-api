@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "dev": "sst dev",
+    "dev": "sst dev --stage dev",
     "deploy": "sst deploy --stage production",
     "deploy:dev": "sst deploy --stage dev",
     "destroy": "sst remove --stage production",

@@ -1,4 +1,5 @@
-const gpxParse = require('gpx-parse');
+const { gpx } = require('@tmcw/togeojson');
+const { DOMParser } = require('@xmldom/xmldom');
 const {
   S3Client,
   GetObjectCommand,
@@ -18,62 +19,48 @@ const streamToString = (stream) =>
   });
 
 const getCoordinatesFromGpx = async (gpxFileContent) => {
-  let compatibleGpxContent = gpxFileContent.replace(
-    /version="1.0"/i,
-    'version="1.1"'
-  );
-  if (!compatibleGpxContent.match(/<gpx[^>]+version=/i)) {
-    compatibleGpxContent = compatibleGpxContent.replace(
-      /<gpx/i,
-      '<gpx version="1.1"'
-    );
-  }
+  try {
+    const doc = new DOMParser().parseFromString(gpxFileContent, 'text/xml');
+    const geojson = gpx(doc);
 
-  return new Promise((resolve, reject) => {
-    gpxParse.parseGpx(compatibleGpxContent, (error, data) => {
-      if (error) {
-        logger.error(`GPX parsing failed: ${error.message}`);
-        return reject(error);
-      }
+    const rows = [];
 
-      const rows = [];
+    // Extract coordinates from GeoJSON features
+    geojson.features.forEach((feature) => {
+      const geometry = feature.geometry;
 
-      if (data.tracks) {
-        data.tracks.forEach((track) => {
-          track.segments.forEach((segment) => {
-            segment.forEach((point) => {
-              rows.push({
-                lat: parseFloat(point.lat.toFixed(6)),
-                lon: parseFloat(point.lon.toFixed(6)),
-              });
-            });
-          });
+      if (geometry.type === 'Point') {
+        // [lon, lat]
+        rows.push({
+          lat: parseFloat(geometry.coordinates[1].toFixed(6)),
+          lon: parseFloat(geometry.coordinates[0].toFixed(6)),
         });
-      }
-
-      if (data.routes) {
-        data.routes.forEach((route) => {
-          route.points.forEach((point) => {
-            rows.push({
-              lat: parseFloat(point.lat.toFixed(6)),
-              lon: parseFloat(point.lon.toFixed(6)),
-            });
-          });
-        });
-      }
-
-      if (data.waypoints) {
-        data.waypoints.forEach((waypoint) => {
+      } else if (geometry.type === 'LineString') {
+        // Array of [lon, lat]
+        geometry.coordinates.forEach((coord) => {
           rows.push({
-            lat: parseFloat(waypoint.lat.toFixed(6)),
-            lon: parseFloat(waypoint.lon.toFixed(6)),
+            lat: parseFloat(coord[1].toFixed(6)),
+            lon: parseFloat(coord[0].toFixed(6)),
+          });
+        });
+      } else if (geometry.type === 'MultiLineString') {
+        // Array of LineStrings
+        geometry.coordinates.forEach((line) => {
+          line.forEach((coord) => {
+            rows.push({
+              lat: parseFloat(coord[1].toFixed(6)),
+              lon: parseFloat(coord[0].toFixed(6)),
+            });
           });
         });
       }
-
-      resolve(rows);
     });
-  });
+
+    return rows;
+  } catch (error) {
+    logger.error(`GPX parsing failed: ${error.message}`);
+    throw error;
+  }
 };
 
 const getGpxContentFromS3 = async (courseId) => {

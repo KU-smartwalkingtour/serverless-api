@@ -133,6 +133,9 @@
 | user | `user/settings` | 설정 수정 | 256MB | 10s |
 | user | `user/password` | 비밀번호 변경 | 256MB | 10s |
 | user | `user/withdraw` | 회원탈퇴 | 256MB | 10s |
+| user | `user/coordinates` | 위치 업데이트 | 256MB | 10s |
+| user | `user/stats/get` | 통계 조회 | 256MB | 10s |
+| user | `user/stats/walk` | 걷기 기록 | 256MB | 10s |
 | user | `user/saved-courses/*` | 저장된 코스 | 256MB | 10s |
 | user | `user/recent-courses/*` | 최근 코스 | 256MB | 10s |
 | medical | `medical/search` | 의료시설 검색 | 256MB | 15s |
@@ -170,6 +173,9 @@ src/layers/common/nodejs/
 | PATCH | /user/settings | user/settings | JWT |
 | PATCH | /user/password | user/password | JWT |
 | DELETE | /user/withdraw | user/withdraw | JWT |
+| PUT | /user/coordinates | user/coordinates | JWT |
+| GET | /user/stats | user/stats/get | JWT |
+| POST | /user/stats/walk | user/stats/walk | JWT |
 | GET | /user/courses/saved-courses | user/saved-courses/get | JWT |
 | PUT | /user/courses/saved-courses/{courseId} | user/saved-courses/save | JWT |
 | DELETE | /user/courses/saved-courses/{courseId} | user/saved-courses/delete | JWT |
@@ -229,6 +235,10 @@ serverless-api/
 │       │   ├── withdraw/index.js
 │       │   ├── settings/index.js
 │       │   ├── password/index.js
+│       │   ├── coordinates/index.js
+│       │   ├── stats/
+│       │   │   ├── get/index.js
+│       │   │   └── walk/index.js
 │       │   ├── saved-courses/
 │       │   │   ├── get/index.js
 │       │   │   ├── save/index.js
@@ -396,11 +406,17 @@ jobs:
 - [x] Weather 함수들 (개별 함수 분리)
 - [x] Courses 함수들 (개별 함수 분리)
 - [x] User 함수들 (개별 함수 분리)
+  - [x] profile, settings, password, withdraw
+  - [x] coordinates, stats/get, stats/walk (누락분 추가 완료)
+  - [x] saved-courses/*, recent-courses/*
 - [x] Medical 함수 (개별 함수 분리)
 - [x] Health 함수
 
-### Phase 4: CI/CD 파이프라인 구축
+### Phase 4: 인프라 구성
 
+- [x] DynamoDB 테이블 생성 (USER_TABLE, AUTH_DATA_TABLE, COURSE_DATA_TABLE, USER_COURSE_TABLE)
+- [x] GSI 설정 (EmailIndex, TokenHashIndex, saved_at, updated_at)
+- [x] Lambda IAM 권한 설정 (DynamoDB 접근)
 - [x] `.github/workflows/serverless-deploy.yml` 작성 (deploy/sst 브랜치)
 - [ ] GitHub Secrets 설정 (수동)
 
