@@ -107,6 +107,14 @@ export default $config({
     };
 
     // ==========================================================================
+    // SES Permission (Email)
+    // ==========================================================================
+    const sesPermissions = {
+      actions: ["ses:SendEmail", "ses:SendRawEmail"],
+      resources: ["*"],
+    };
+
+    // ==========================================================================
     // API Gateway
     // ==========================================================================
     const api = new sst.aws.ApiGatewayV2("Api", {
@@ -173,7 +181,7 @@ export default $config({
       layers: [commonLayerArn],
       memory: "256 MB",
       timeout: "10 seconds",
-      permissions: [dynamoDbPermissions],
+      permissions: [dynamoDbPermissions, sesPermissions],
       environment: authEnv,
       nodejs: nodejsConfig,
     });
