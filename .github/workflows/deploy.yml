@@ -38,6 +38,31 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Publish Lambda Layer
+        id: publish-layer
+        run: |
+          cd src/layers/common/nodejs
+          yarn install --production --frozen-lockfile
+          cd ..
+          zip -r common-layer.zip nodejs
+          
+          echo "Publishing Lambda Layer..."
+          LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
+            --layer-name ku-swt-common-layer \
+            --description "Common Layer for KU SWT (Commit: ${{ github.sha }})" \
+            --zip-file fileb://common-layer.zip \
+            --compatible-runtimes nodejs20.x \
+            --output text \
+            --query LayerVersionArn)
+          
+          echo "LAYER_ARN=$LAYER_VERSION_ARN" >> $GITHUB_ENV
+          echo "Published Layer ARN: $LAYER_VERSION_ARN"
+
+      - name: Update sst.config.ts with new Layer ARN
+        run: |
+          sed -i "s|const commonLayerArn = \".*\";|const commonLayerArn = \"${{ env.LAYER_ARN }}\";|g" sst.config.ts
+          cat sst.config.ts | grep "const commonLayerArn"
+
       - name: Deploy to AWS (Production)
         run: npx sst deploy --stage production
         env:
