@@ -244,7 +244,7 @@ exports.handler = async () => {
     statusCode: 200,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'public, max-age=3600',
+      'Cache-Control': 'no-store, max-age=0',
       'Access-Control-Allow-Origin': '*',
     },
     body: JSON.stringify(spec),

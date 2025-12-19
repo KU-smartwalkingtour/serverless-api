@@ -227,7 +227,7 @@ const openApiSpec = {
     },
   },
   security: [{ bearerAuth: [] }],
-  servers: [{ url: 'https://gspl0i5f44.execute-api.ap-northeast-2.amazonaws.com', description: 'Production API Gateway' }],
+  servers: [{ url: 'https://obc0v1juwf.execute-api.ap-northeast-2.amazonaws.com', description: 'Production API Gateway' }],
   paths: {
     '/auth/forgot-password/send': {
       post: {
