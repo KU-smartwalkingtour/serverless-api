@@ -208,7 +208,7 @@ const spec = {
     },
   },
   security: [{ bearerAuth: [] }],
-  servers: [{ url: 'https://gspl0i5f44.execute-api.ap-northeast-2.amazonaws.com', description: 'Production API Gateway' }],
+  servers: [{ url: 'https://obc0v1juwf.execute-api.ap-northeast-2.amazonaws.com', description: 'Production API Gateway' }],
   paths: {
     '/auth/forgot-password/send': { post: { summary: '비밀번호 재설정 코드 전송', tags: ['Auth'], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email'], properties: { email: { type: 'string', format: 'email' } } } } } }, responses: { 200: { description: '비밀번호 재설정 코드가 전송되었습니다.' }, 400: { description: '입력값이 유효하지 않음' }, 404: { description: '사용자를 찾을 수 없음' }, 429: { description: '요청 횟수 제한 초과' }, 500: { description: '서버 오류' } } } },
     '/auth/forgot-password/verify': { post: { summary: '비밀번호 재설정 코드 검증', tags: ['Auth'], requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['email', 'code', 'newPassword'], properties: { email: { type: 'string', format: 'email' }, code: { type: 'string' }, newPassword: { type: 'string', minLength: 8 } } } } } }, responses: { 200: { description: '비밀번호가 성공적으로 재설정되었습니다.' }, 400: { description: '유효하지 않은 코드' }, 404: { description: '사용자를 찾을 수 없음' }, 500: { description: '서버 오류' } } } },
