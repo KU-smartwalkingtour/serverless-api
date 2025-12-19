@@ -1,7 +1,7 @@
-const { logger } = require('/opt/nodejs/utils/logger');
-const { success, error } = require('/opt/nodejs/utils/response');
-const { ServerError, ERROR_CODES } = require('/opt/nodejs/utils/error');
-const { search } = require('/opt/nodejs/services/medicalService');
+const { logger } = require('utils/logger');
+const { success, error } = require('utils/response');
+const { ServerError, ERROR_CODES } = require('utils/error');
+const { search } = require('services/medicalService');
 
 exports.handler = async (event) => {
   const query = event.queryStringParameters || {};

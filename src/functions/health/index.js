@@ -1,4 +1,4 @@
-const { success } = require('/opt/nodejs/utils/response');
+const { success } = require('utils/response');
 
 exports.handler = async () => {
   return success({

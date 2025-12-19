@@ -1,7 +1,7 @@
-const { logger } = require('/opt/nodejs/utils/logger');
-const { success, error } = require('/opt/nodejs/utils/response');
-const { ServerError, ERROR_CODES } = require('/opt/nodejs/utils/error');
-const { login } = require('/opt/nodejs/services/authService');
+const { logger } = require('utils/logger');
+const { success, error } = require('utils/response');
+const { ServerError, ERROR_CODES } = require('utils/error');
+const { login } = require('services/authService');
 
 exports.handler = async (event) => {
   const body = event.body ? JSON.parse(event.body) : {};

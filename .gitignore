@@ -5,6 +5,7 @@ src/layers/common/nodejs/yarn.lock
 
 # Lambda layer zip
 src/layers/common-layer.zip
+src/layers/common/common-layer.zip
 
 # Build output
 /dist
@@ -31,3 +32,6 @@ yarn-error.log*
 
 # Claude
 CLAUDE.md
+
+# Gemini
+.gemini/

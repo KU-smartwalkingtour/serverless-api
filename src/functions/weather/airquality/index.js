@@ -1,7 +1,7 @@
-const { logger } = require('/opt/nodejs/utils/logger');
-const { success, error } = require('/opt/nodejs/utils/response');
-const { ServerError, ERROR_CODES } = require('/opt/nodejs/utils/error');
-const { getAirQuality } = require('/opt/nodejs/services/weatherService');
+const { logger } = require('utils/logger');
+const { success, error } = require('utils/response');
+const { ServerError, ERROR_CODES } = require('utils/error');
+const { getAirQuality } = require('services/weatherService');
 
 exports.handler = async (event) => {
   const query = event.queryStringParameters || {};

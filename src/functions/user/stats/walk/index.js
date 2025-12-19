@@ -1,8 +1,8 @@
-const { logger } = require('/opt/nodejs/utils/logger');
-const { success, error } = require('/opt/nodejs/utils/response');
-const { ServerError, ERROR_CODES } = require('/opt/nodejs/utils/error');
-const { validateBody, logWalkSchema } = require('/opt/nodejs/utils/validation');
-const { logWalk } = require('/opt/nodejs/services/userService');
+const { logger } = require('utils/logger');
+const { success, error } = require('utils/response');
+const { ServerError, ERROR_CODES } = require('utils/error');
+const { validateBody, logWalkSchema } = require('utils/validation');
+const { logWalk } = require('services/userService');
 
 exports.handler = async (event) => {
   const userId = event.requestContext?.authorizer?.lambda?.userId;

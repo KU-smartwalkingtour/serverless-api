@@ -28,12 +28,13 @@ export default $config({
     // Lambda Layer (pre-uploaded to AWS)
     // 수동 업로드: aws lambda publish-layer-version --layer-name ku-swt-common-layer ...
     // ==========================================================================
-    const commonLayerArn = "arn:aws:lambda:ap-northeast-2:676206945897:layer:ku-swt-common-layer:3";
+    const commonLayerArn = "arn:aws:lambda:ap-northeast-2:676206945897:layer:ku-swt-common-layer:4";
 
     // ==========================================================================
     // Environment Variables
     // ==========================================================================
     const commonEnv = {
+      NODE_PATH: "/opt/nodejs",
       DB_HOST: process.env.DB_HOST!,
       DB_PORT: process.env.DB_PORT || "5432",
       DB_NAME: process.env.DB_NAME!,
@@ -71,12 +72,7 @@ export default $config({
     const nodejsConfig = {
       format: "cjs" as const,
       esbuild: {
-        external: [
-          "/opt/nodejs/utils/*",
-          "/opt/nodejs/services/*",
-          "/opt/nodejs/config/*",
-          "/opt/nodejs/models/*",
-        ],
+        external: ["utils/*", "services/*", "config/*", "models/*"],
       },
     };
 
@@ -124,6 +120,17 @@ export default $config({
         allowHeaders: ["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key"],
       },
     });
+
+    // ==========================================================================
+    // S3 Permission (GPX Storage)
+    // ==========================================================================
+    const s3Permissions = {
+      actions: ["s3:GetObject"], // 읽기 권한 (필요시 s3:PutObject 등 추가)
+      resources: [
+        "arn:aws:s3:::ku-smartwalkingtour-seoultrail-gpxstorage-bucket",
+        "arn:aws:s3:::ku-smartwalkingtour-seoultrail-gpxstorage-bucket/*" 
+      ],
+    };
 
     // Lambda Authorizer 설정
     const jwtAuth = api.addAuthorizer({
@@ -338,7 +345,7 @@ export default $config({
         layers: [commonLayerArn],
         memory: "256 MB",
         timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
+        permissions: [dynamoDbPermissions,s3Permissions],
         environment: coursesEnv,
         nodejs: nodejsConfig,
       },

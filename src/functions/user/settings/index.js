@@ -1,7 +1,7 @@
-const { logger } = require('/opt/nodejs/utils/logger');
-const { success, error } = require('/opt/nodejs/utils/response');
-const { ServerError, ERROR_CODES } = require('/opt/nodejs/utils/error');
-const { updateSettings } = require('/opt/nodejs/services/userService');
+const { logger } = require('utils/logger');
+const { success, error } = require('utils/response');
+const { ServerError, ERROR_CODES } = require('utils/error');
+const { updateSettings } = require('services/userService');
 
 exports.handler = async (event) => {
   const userId = event.requestContext?.authorizer?.lambda?.userId;

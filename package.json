@@ -14,7 +14,8 @@
     "build": "node build.js",
     "clean": "rm -rf dist .sst",
     "docker:build": "docker build --no-cache -t cloudwebservice-server:optimized .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "postinstall": "ln -sf ../src/layers/common/nodejs/utils node_modules/utils && ln -sf ../src/layers/common/nodejs/services node_modules/services && ln -sf ../src/layers/common/nodejs/config node_modules/config && ln -sf ../src/layers/common/nodejs/models node_modules/models"
   },
   "keywords": [],
   "author": "",
@@ -25,6 +26,8 @@
     "@aws-sdk/client-s3": "^3.901.0",
     "@aws-sdk/client-sesv2": "^3.917.0",
     "@aws-sdk/lib-dynamodb": "^3.940.0",
+    "@tmcw/togeojson": "^7.1.2",
+    "@xmldom/xmldom": "^0.8.11",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",

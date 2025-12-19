@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { GetCommand } = require('@aws-sdk/lib-dynamodb');
-const { docClient, TABLES } = require('/opt/nodejs/config/dynamodb');
-const { logger } = require('/opt/nodejs/utils/logger');
+const { docClient, TABLES } = require('config/dynamodb');
+const { logger } = require('utils/logger');
 
 /**
  * Lambda Authorizer for HTTP API v2 with Simple Response format
