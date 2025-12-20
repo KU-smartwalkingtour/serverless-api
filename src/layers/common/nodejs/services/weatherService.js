@@ -6,17 +6,17 @@ const {
 } = require('../utils/weather');
 
 async function getIntegratedWeather(query) {
-  const { lng, lat } = query;
+  const { lon, lat } = query;
 
-  if (!lng || !lat) {
+  if (!lon || !lat) {
     throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
   }
 
-  logger.info(`Integrated weather request: lat=${lat}, lng=${lng}`);
+  logger.info(`Integrated weather request: lat=${lat}, lon=${lon}`);
 
   const [weatherData, airQualityData] = await Promise.allSettled([
-    getWeatherSummary(lng, lat),
-    getAirQualitySummary(lng, lat),
+    getWeatherSummary(lon, lat),
+    getAirQualitySummary(lon, lat),
   ]);
 
   let weatherSummary = null;
@@ -70,7 +70,7 @@ async function getIntegratedWeather(query) {
   if (weatherData.status === 'rejected') {
     logger.warn('Weather fetch failed', {
       lat,
-      lng,
+      lon,
       error: weatherData.reason?.message,
     });
   }
@@ -78,7 +78,7 @@ async function getIntegratedWeather(query) {
   if (airQualityData.status === 'rejected') {
     logger.warn('Air quality fetch failed', {
       lat,
-      lng,
+      lon,
       error: airQualityData.reason?.message,
     });
   }
@@ -87,7 +87,7 @@ async function getIntegratedWeather(query) {
     weatherData.status === 'rejected' &&
     airQualityData.status === 'rejected'
   ) {
-    logger.error('Both weather and air quality fetch failed', { lat, lng });
+    logger.error('Both weather and air quality fetch failed', { lat, lon });
     throw new ServerError(ERROR_CODES.WEATHER_API_ERROR, 500);
   }
 
@@ -95,23 +95,23 @@ async function getIntegratedWeather(query) {
 }
 
 async function getWeather(query) {
-  const { lng, lat } = query;
+  const { lon, lat } = query;
 
-  if (!lng || !lat) {
+  if (!lon || !lat) {
     throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
   }
 
-  return await getWeatherSummary(lng, lat);
+  return await getWeatherSummary(lon, lat);
 }
 
 async function getAirQuality(query) {
-  const { lng, lat } = query;
+  const { lon, lat } = query;
 
-  if (!lng || !lat) {
+  if (!lon || !lat) {
     throw new ServerError(ERROR_CODES.INVALID_QUERY_PARAMS, 400);
   }
 
-  const airQualityData = await getAirQualitySummary(lng, lat);
+  const airQualityData = await getAirQualitySummary(lon, lat);
 
   if (airQualityData === null) {
     throw new ServerError(ERROR_CODES.AIRKOREA_API_ERROR, 404);
