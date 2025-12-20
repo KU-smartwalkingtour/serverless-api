@@ -1,6 +1,6 @@
 # ku-smartwalkingtour API Server
 
-# AWS Lambda 기반 Swagger Documentation(정상 작동)
+## AWS Lambda 기반 Swagger Documentation(정상 작동)
 # 📑 [SWAGGER 링크](https://obc0v1juwf.execute-api.ap-northeast-2.amazonaws.com/api-docs#/User/get_user_profile)
 
 ### 주요 기술 스택
