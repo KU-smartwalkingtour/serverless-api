@@ -35,11 +35,6 @@ export default $config({
     // ==========================================================================
     const commonEnv = {
       NODE_PATH: "/opt/nodejs",
-      DB_HOST: process.env.DB_HOST!,
-      DB_PORT: process.env.DB_PORT || "5432",
-      DB_NAME: process.env.DB_NAME!,
-      DB_USER: process.env.DB_USER!,
-      DB_PASSWORD: process.env.DB_PASSWORD!,
     };
 
     const authEnv = {
@@ -50,6 +45,7 @@ export default $config({
     const weatherEnv = {
       ...commonEnv,
       KMA_API_KEY: process.env.KMA_API_KEY!,
+      AIRKOREA_API_KEY: process.env.AIRKOREA_API_KEY!,
     };
 
     const coursesEnv = {

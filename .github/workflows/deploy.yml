@@ -63,19 +63,17 @@ jobs:
           sed -i "s|const commonLayerArn = \".*\";|const commonLayerArn = \"${{ env.LAYER_ARN }}\";|g" sst.config.ts
           cat sst.config.ts | grep "const commonLayerArn"
 
+      - name: Create .env file for SST
+        run: |
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "KMA_API_KEY=${{ secrets.KMA_API_KEY }}" >> .env
+          echo "AIRKOREA_API_KEY=${{ secrets.AIRKOREA_API_KEY }}" >> .env
+          echo "DURUNUBI_SERVICE_KEY=${{ secrets.DURUNUBI_SERVICE_KEY }}" >> .env
+          echo "SEOUL_TRAIL_API_KEY=${{ secrets.SEOUL_TRAIL_API_KEY }}" >> .env
+          echo "NMC_HOSPITAL_KEY=${{ secrets.NMC_HOSPITAL_KEY }}" >> .env
+
       - name: Deploy to AWS (Production)
-        run: npx sst deploy --stage production
-        env:
-          DB_HOST: ${{ secrets.DB_HOST }}
-          DB_PORT: ${{ secrets.DB_PORT }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          KMA_API_KEY: ${{ secrets.KMA_API_KEY }}
-          DURUNUBI_SERVICE_KEY: ${{ secrets.DURUNUBI_SERVICE_KEY }}
-          SEOUL_TRAIL_API_KEY: ${{ secrets.SEOUL_TRAIL_API_KEY }}
-          NMC_HOSPITAL_KEY: ${{ secrets.NMC_HOSPITAL_KEY }}
+        run: node -r dotenv/config node_modules/.bin/sst deploy --stage production
 
       - name: Deployment Summary
         run: |
