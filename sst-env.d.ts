@@ -5,10 +5,6 @@
 
 declare module "sst" {
   export interface Resource {
-    "AlarmTopic": {
-      "arn": string
-      "type": "sst.aws.SnsTopic"
-    }
     "Api": {
       "type": "sst.aws.ApiGatewayV2"
       "url": string

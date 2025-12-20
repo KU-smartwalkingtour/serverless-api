@@ -28,18 +28,18 @@ export default $config({
     // Lambda Layer (pre-uploaded to AWS)
     // 수동 업로드: aws lambda publish-layer-version --layer-name ku-swt-common-layer ...
     // ==========================================================================
-    const commonLayerArn = "arn:aws:lambda:ap-northeast-2:676206945897:layer:ku-swt-common-layer:4";
+    const commonLayerArn = "arn:aws:lambda:ap-northeast-2:676206945897:layer:ku-swt-common-layer:8";
 
     // ==========================================================================
     // Environment Variables
     // ==========================================================================
     const commonEnv = {
       NODE_PATH: "/opt/nodejs",
+      JWT_SECRET: process.env.JWT_SECRET!
     };
 
     const authEnv = {
-      ...commonEnv,
-      JWT_SECRET: process.env.JWT_SECRET!,
+      ...commonEnv
     };
 
     const weatherEnv = {
@@ -139,6 +139,7 @@ export default $config({
           timeout: "5 seconds",
           permissions: [dynamoDbPermissions],
           environment: {
+            ...commonEnv,
             JWT_SECRET: process.env.JWT_SECRET!,
           },
           nodejs: nodejsConfig,
