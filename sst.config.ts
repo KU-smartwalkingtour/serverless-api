@@ -25,16 +25,9 @@ export default $config({
     };
 
     // ==========================================================================
-    // Lambda Layer (pre-uploaded to AWS)
-    // 수동 업로드: aws lambda publish-layer-version --layer-name ku-swt-common-layer ...
-    // ==========================================================================
-    const commonLayerArn = "arn:aws:lambda:ap-northeast-2:676206945897:layer:ku-swt-common-layer:8";
-
-    // ==========================================================================
     // Environment Variables
     // ==========================================================================
     const commonEnv = {
-      NODE_PATH: "/opt/nodejs",
       JWT_SECRET: process.env.JWT_SECRET!
     };
 
@@ -63,13 +56,10 @@ export default $config({
     };
 
     // ==========================================================================
-    // Lambda Function Common Settings (for Layer external modules)
+    // Lambda Function Common Settings
     // ==========================================================================
     const nodejsConfig = {
       format: "cjs" as const,
-      esbuild: {
-        external: ["utils/*", "services/*", "config/*", "models/*"],
-      },
     };
 
     // ==========================================================================
@@ -134,7 +124,6 @@ export default $config({
       lambda: {
         function: {
           handler: "src/functions/authorizer/index.handler",
-          layers: [commonLayerArn],
           memory: "128 MB",
           timeout: "5 seconds",
           permissions: [dynamoDbPermissions],
@@ -148,72 +137,26 @@ export default $config({
     });
 
     // ==========================================================================
-    // Auth Routes (No Auth Required)
+    // Auth Routes
     // ==========================================================================
-    api.route("POST /auth/register", {
-      handler: "src/functions/auth/register/index.handler",
-      layers: [commonLayerArn],
-      memory: "256 MB",
-      timeout: "10 seconds",
-      permissions: [dynamoDbPermissions],
-      environment: authEnv,
-      nodejs: nodejsConfig,
-    });
-
-    api.route("POST /auth/login", {
-      handler: "src/functions/auth/login/index.handler",
-      layers: [commonLayerArn],
-      memory: "256 MB",
-      timeout: "10 seconds",
-      permissions: [dynamoDbPermissions],
-      environment: authEnv,
-      nodejs: nodejsConfig,
-    });
-
-    api.route("POST /auth/refresh-token", {
-      handler: "src/functions/auth/refresh-token/index.handler",
-      layers: [commonLayerArn],
-      memory: "256 MB",
-      timeout: "10 seconds",
-      permissions: [dynamoDbPermissions],
-      environment: authEnv,
-      nodejs: nodejsConfig,
-    });
-
-    api.route("POST /auth/forgot-password/send", {
-      handler: "src/functions/auth/forgot-password-send/index.handler",
-      layers: [commonLayerArn],
+    const authFunction = {
+      handler: "src/functions/auth/index.handler",
       memory: "256 MB",
       timeout: "10 seconds",
       permissions: [dynamoDbPermissions, sesPermissions],
       environment: authEnv,
       nodejs: nodejsConfig,
-    });
+    };
 
-    api.route("POST /auth/forgot-password/verify", {
-      handler: "src/functions/auth/forgot-password-verify/index.handler",
-      layers: [commonLayerArn],
-      memory: "256 MB",
-      timeout: "10 seconds",
-      permissions: [dynamoDbPermissions],
-      environment: authEnv,
-      nodejs: nodejsConfig,
-    });
+    api.route("POST /auth/register", authFunction);
+    api.route("POST /auth/login", authFunction);
+    api.route("POST /auth/refresh-token", authFunction);
+    api.route("POST /auth/forgot-password/send", authFunction);
+    api.route("POST /auth/forgot-password/verify", authFunction);
 
-    // ==========================================================================
-    // Auth Routes (Auth Required)
-    // ==========================================================================
     api.route(
       "POST /auth/logout",
-      {
-        handler: "src/functions/auth/logout/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      authFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -224,17 +167,18 @@ export default $config({
     // ==========================================================================
     // Weather Routes
     // ==========================================================================
+    const weatherFunction = {
+      handler: "src/functions/weather/index.handler",
+      memory: "256 MB",
+      timeout: "15 seconds",
+      permissions: [dynamoDbPermissions],
+      environment: weatherEnv,
+      nodejs: nodejsConfig,
+    };
+
     api.route(
       "GET /weather",
-      {
-        handler: "src/functions/weather/integrated/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "15 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: weatherEnv,
-        nodejs: nodejsConfig,
-      },
+      weatherFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -244,15 +188,7 @@ export default $config({
 
     api.route(
       "GET /weather/summary",
-      {
-        handler: "src/functions/weather/summary/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "15 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: weatherEnv,
-        nodejs: nodejsConfig,
-      },
+      weatherFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -262,15 +198,7 @@ export default $config({
 
     api.route(
       "GET /weather/airquality",
-      {
-        handler: "src/functions/weather/airquality/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "15 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: weatherEnv,
-        nodejs: nodejsConfig,
-      },
+      weatherFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -281,17 +209,18 @@ export default $config({
     // ==========================================================================
     // Courses Routes
     // ==========================================================================
+    const coursesFunction = {
+      handler: "src/functions/courses/index.handler",
+      memory: "256 MB",
+      timeout: "10 seconds",
+      permissions: [dynamoDbPermissions, s3Permissions],
+      environment: coursesEnv,
+      nodejs: nodejsConfig,
+    };
+
     api.route(
       "GET /courses/home",
-      {
-        handler: "src/functions/courses/home/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: coursesEnv,
-        nodejs: nodejsConfig,
-      },
+      coursesFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -301,15 +230,7 @@ export default $config({
 
     api.route(
       "GET /courses/course",
-      {
-        handler: "src/functions/courses/list/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: coursesEnv,
-        nodejs: nodejsConfig,
-      },
+      coursesFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -319,15 +240,7 @@ export default $config({
 
     api.route(
       "GET /courses/{courseId}",
-      {
-        handler: "src/functions/courses/detail/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: coursesEnv,
-        nodejs: nodejsConfig,
-      },
+      coursesFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -337,15 +250,7 @@ export default $config({
 
     api.route(
       "GET /courses/{courseId}/coordinates",
-      {
-        handler: "src/functions/courses/coordinates/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions,s3Permissions],
-        environment: coursesEnv,
-        nodejs: nodejsConfig,
-      },
+      coursesFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -356,17 +261,18 @@ export default $config({
     // ==========================================================================
     // User Routes
     // ==========================================================================
+    const userFunction = {
+      handler: "src/functions/user/index.handler",
+      memory: "256 MB",
+      timeout: "10 seconds",
+      permissions: [dynamoDbPermissions],
+      environment: authEnv,
+      nodejs: nodejsConfig,
+    };
+
     api.route(
       "GET /user/profile",
-      {
-        handler: "src/functions/user/profile/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -376,15 +282,7 @@ export default $config({
 
     api.route(
       "PATCH /user/settings",
-      {
-        handler: "src/functions/user/settings/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -394,15 +292,7 @@ export default $config({
 
     api.route(
       "PATCH /user/password",
-      {
-        handler: "src/functions/user/password/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -412,15 +302,7 @@ export default $config({
 
     api.route(
       "DELETE /user/withdraw",
-      {
-        handler: "src/functions/user/withdraw/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -433,15 +315,7 @@ export default $config({
     // ==========================================================================
     api.route(
       "PUT /user/coordinates",
-      {
-        handler: "src/functions/user/coordinates/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -451,15 +325,7 @@ export default $config({
 
     api.route(
       "GET /user/stats",
-      {
-        handler: "src/functions/user/stats/get/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -469,15 +335,7 @@ export default $config({
 
     api.route(
       "POST /user/stats/walk",
-      {
-        handler: "src/functions/user/stats/walk/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -490,15 +348,7 @@ export default $config({
     // ==========================================================================
     api.route(
       "GET /user/courses/saved-courses",
-      {
-        handler: "src/functions/user/saved-courses/get/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -508,15 +358,7 @@ export default $config({
 
     api.route(
       "PUT /user/courses/saved-courses/{courseId}",
-      {
-        handler: "src/functions/user/saved-courses/save/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -526,15 +368,7 @@ export default $config({
 
     api.route(
       "DELETE /user/courses/saved-courses/{courseId}",
-      {
-        handler: "src/functions/user/saved-courses/delete/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -547,15 +381,7 @@ export default $config({
     // ==========================================================================
     api.route(
       "GET /user/courses/recent-courses",
-      {
-        handler: "src/functions/user/recent-courses/get/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -565,15 +391,7 @@ export default $config({
 
     api.route(
       "PUT /user/courses/recent-courses/{courseId}",
-      {
-        handler: "src/functions/user/recent-courses/add/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -583,15 +401,7 @@ export default $config({
 
     api.route(
       "DELETE /user/courses/recent-courses/{courseId}",
-      {
-        handler: "src/functions/user/recent-courses/delete/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "10 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: authEnv,
-        nodejs: nodejsConfig,
-      },
+      userFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -602,17 +412,18 @@ export default $config({
     // ==========================================================================
     // Medical Routes
     // ==========================================================================
+    const medicalFunction = {
+      handler: "src/functions/medical/index.handler",
+      memory: "256 MB",
+      timeout: "15 seconds",
+      permissions: [dynamoDbPermissions],
+      environment: medicalEnv,
+      nodejs: nodejsConfig,
+    };
+
     api.route(
       "GET /medical/search",
-      {
-        handler: "src/functions/medical/search/index.handler",
-        layers: [commonLayerArn],
-        memory: "256 MB",
-        timeout: "15 seconds",
-        permissions: [dynamoDbPermissions],
-        environment: medicalEnv,
-        nodejs: nodejsConfig,
-      },
+      medicalFunction,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -625,7 +436,6 @@ export default $config({
     // ==========================================================================
     api.route("GET /health", {
       handler: "src/functions/health/index.handler",
-      layers: [commonLayerArn],
       memory: "128 MB",
       timeout: "5 seconds",
       nodejs: nodejsConfig,

@@ -15,7 +15,7 @@
     "clean": "rm -rf dist .sst",
     "docker:build": "docker build --no-cache -t cloudwebservice-server:optimized .",
     "format": "prettier --write .",
-    "postinstall": "ln -sf ../src/layers/common/nodejs/utils node_modules/utils && ln -sf ../src/layers/common/nodejs/services node_modules/services && ln -sf ../src/layers/common/nodejs/config node_modules/config && ln -sf ../src/layers/common/nodejs/models node_modules/models"
+    "postinstall": "ln -sf ../src/utils node_modules/utils && ln -sf ../src/services node_modules/services && ln -sf ../src/config node_modules/config && ln -sf ../src/models node_modules/models"
   },
   "keywords": [],
   "author": "",
