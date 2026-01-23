@@ -137,26 +137,71 @@ export default $config({
     });
 
     // ==========================================================================
-    // Auth Routes
+    // Domain Functions
     // ==========================================================================
-    const authFunction = {
+    
+    // Auth Function
+    const authFunction = new sst.aws.Function("AuthFunction", {
       handler: "src/functions/auth/index.handler",
-      memory: "256 MB",
-      timeout: "10 seconds",
+      memory: "256 MB" as const,
+      timeout: "10 seconds" as const,
       permissions: [dynamoDbPermissions, sesPermissions],
       environment: authEnv,
       nodejs: nodejsConfig,
-    };
+    });
 
-    api.route("POST /auth/register", authFunction);
-    api.route("POST /auth/login", authFunction);
-    api.route("POST /auth/refresh-token", authFunction);
-    api.route("POST /auth/forgot-password/send", authFunction);
-    api.route("POST /auth/forgot-password/verify", authFunction);
+    // Weather Function
+    const weatherFunction = new sst.aws.Function("WeatherFunction", {
+      handler: "src/functions/weather/index.handler",
+      memory: "256 MB" as const,
+      timeout: "15 seconds" as const,
+      permissions: [dynamoDbPermissions],
+      environment: weatherEnv,
+      nodejs: nodejsConfig,
+    });
+
+    // Courses Function
+    const coursesFunction = new sst.aws.Function("CoursesFunction", {
+      handler: "src/functions/courses/index.handler",
+      memory: "256 MB" as const,
+      timeout: "10 seconds" as const,
+      permissions: [dynamoDbPermissions, s3Permissions],
+      environment: coursesEnv,
+      nodejs: nodejsConfig,
+    });
+
+    // User Function
+    const userFunction = new sst.aws.Function("UserFunction", {
+      handler: "src/functions/user/index.handler",
+      memory: "256 MB" as const,
+      timeout: "10 seconds" as const,
+      permissions: [dynamoDbPermissions],
+      environment: authEnv,
+      nodejs: nodejsConfig,
+    });
+
+    // Medical Function
+    const medicalFunction = new sst.aws.Function("MedicalFunction", {
+      handler: "src/functions/medical/index.handler",
+      memory: "256 MB" as const,
+      timeout: "15 seconds" as const,
+      permissions: [dynamoDbPermissions],
+      environment: medicalEnv,
+      nodejs: nodejsConfig,
+    });
+
+    // ==========================================================================
+    // Auth Routes
+    // ==========================================================================
+    api.route("POST /auth/register", authFunction.arn);
+    api.route("POST /auth/login", authFunction.arn);
+    api.route("POST /auth/refresh-token", authFunction.arn);
+    api.route("POST /auth/forgot-password/send", authFunction.arn);
+    api.route("POST /auth/forgot-password/verify", authFunction.arn);
 
     api.route(
       "POST /auth/logout",
-      authFunction,
+      authFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -167,18 +212,9 @@ export default $config({
     // ==========================================================================
     // Weather Routes
     // ==========================================================================
-    const weatherFunction = {
-      handler: "src/functions/weather/index.handler",
-      memory: "256 MB",
-      timeout: "15 seconds",
-      permissions: [dynamoDbPermissions],
-      environment: weatherEnv,
-      nodejs: nodejsConfig,
-    };
-
     api.route(
       "GET /weather",
-      weatherFunction,
+      weatherFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -188,7 +224,7 @@ export default $config({
 
     api.route(
       "GET /weather/summary",
-      weatherFunction,
+      weatherFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -198,7 +234,7 @@ export default $config({
 
     api.route(
       "GET /weather/airquality",
-      weatherFunction,
+      weatherFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -209,18 +245,9 @@ export default $config({
     // ==========================================================================
     // Courses Routes
     // ==========================================================================
-    const coursesFunction = {
-      handler: "src/functions/courses/index.handler",
-      memory: "256 MB",
-      timeout: "10 seconds",
-      permissions: [dynamoDbPermissions, s3Permissions],
-      environment: coursesEnv,
-      nodejs: nodejsConfig,
-    };
-
     api.route(
       "GET /courses/home",
-      coursesFunction,
+      coursesFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -230,7 +257,7 @@ export default $config({
 
     api.route(
       "GET /courses/course",
-      coursesFunction,
+      coursesFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -240,7 +267,7 @@ export default $config({
 
     api.route(
       "GET /courses/{courseId}",
-      coursesFunction,
+      coursesFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -250,7 +277,7 @@ export default $config({
 
     api.route(
       "GET /courses/{courseId}/coordinates",
-      coursesFunction,
+      coursesFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -261,18 +288,9 @@ export default $config({
     // ==========================================================================
     // User Routes
     // ==========================================================================
-    const userFunction = {
-      handler: "src/functions/user/index.handler",
-      memory: "256 MB",
-      timeout: "10 seconds",
-      permissions: [dynamoDbPermissions],
-      environment: authEnv,
-      nodejs: nodejsConfig,
-    };
-
     api.route(
       "GET /user/profile",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -282,7 +300,7 @@ export default $config({
 
     api.route(
       "PATCH /user/settings",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -292,7 +310,7 @@ export default $config({
 
     api.route(
       "PATCH /user/password",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -302,7 +320,7 @@ export default $config({
 
     api.route(
       "DELETE /user/withdraw",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -315,7 +333,7 @@ export default $config({
     // ==========================================================================
     api.route(
       "PUT /user/coordinates",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -325,7 +343,7 @@ export default $config({
 
     api.route(
       "GET /user/stats",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -335,7 +353,7 @@ export default $config({
 
     api.route(
       "POST /user/stats/walk",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -348,7 +366,7 @@ export default $config({
     // ==========================================================================
     api.route(
       "GET /user/courses/saved-courses",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -358,7 +376,7 @@ export default $config({
 
     api.route(
       "PUT /user/courses/saved-courses/{courseId}",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -368,7 +386,7 @@ export default $config({
 
     api.route(
       "DELETE /user/courses/saved-courses/{courseId}",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -381,7 +399,7 @@ export default $config({
     // ==========================================================================
     api.route(
       "GET /user/courses/recent-courses",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -391,7 +409,7 @@ export default $config({
 
     api.route(
       "PUT /user/courses/recent-courses/{courseId}",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -401,7 +419,7 @@ export default $config({
 
     api.route(
       "DELETE /user/courses/recent-courses/{courseId}",
-      userFunction,
+      userFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -412,18 +430,9 @@ export default $config({
     // ==========================================================================
     // Medical Routes
     // ==========================================================================
-    const medicalFunction = {
-      handler: "src/functions/medical/index.handler",
-      memory: "256 MB",
-      timeout: "15 seconds",
-      permissions: [dynamoDbPermissions],
-      environment: medicalEnv,
-      nodejs: nodejsConfig,
-    };
-
     api.route(
       "GET /medical/search",
-      medicalFunction,
+      medicalFunction.arn,
       {
         auth: {
           lambda: jwtAuth.id,
@@ -467,7 +476,7 @@ export default $config({
 
       // API Gateway 5xx Error Alarm
       new aws.cloudwatch.MetricAlarm("Api5xxAlarm", {
-        alarmName: "ku-swt-api-5xx-errors",
+        name: "ku-swt-api-5xx-errors",
         comparisonOperator: "GreaterThanThreshold",
         evaluationPeriods: 1,
         metricName: "5XXError",
@@ -484,7 +493,7 @@ export default $config({
 
       // API Gateway 4xx Error Alarm
       new aws.cloudwatch.MetricAlarm("Api4xxAlarm", {
-        alarmName: "ku-swt-api-4xx-errors",
+        name: "ku-swt-api-4xx-errors",
         comparisonOperator: "GreaterThanThreshold",
         evaluationPeriods: 1,
         metricName: "4XXError",
@@ -501,7 +510,7 @@ export default $config({
 
       // API Gateway Latency Alarm
       new aws.cloudwatch.MetricAlarm("ApiLatencyAlarm", {
-        alarmName: "ku-swt-api-high-latency",
+        name: "ku-swt-api-high-latency",
         comparisonOperator: "GreaterThanThreshold",
         evaluationPeriods: 2,
         metricName: "Latency",
