@@ -1,18 +1,17 @@
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
-const { v4: uuidv4 } = require('uuid');
 const {
-  QueryCommand,
-  GetCommand,
-  PutCommand,
-  UpdateCommand,
-  TransactWriteCommand,
-} = require('@aws-sdk/lib-dynamodb');
+  CognitoIdentityProviderClient,
+  SignUpCommand,
+  InitiateAuthCommand,
+  GlobalSignOutCommand,
+  ForgotPasswordCommand,
+  ConfirmForgotPasswordCommand,
+  AdminConfirmSignUpCommand,
+  AdminUpdateUserAttributesCommand,
+} = require('@aws-sdk/client-cognito-identity-provider');
+const { PutCommand, QueryCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
 const { docClient, TABLES } = require('../config/dynamodb');
 const { logger } = require('../utils/logger');
 const { ServerError, ERROR_CODES } = require('../utils/error');
-const { generateTokens, hashToken } = require('../utils/auth');
-const { sendPasswordResetEmail } = require('../utils/sendEmail');
 const {
   loginSchema,
   registerSchema,
@@ -20,15 +19,36 @@ const {
   forgotPasswordSchema,
 } = require('../utils/validation');
 
-const BCRYPT_SALT_ROUNDS = 10;
-const CODE_EXPIRY_MINUTES = 10;
-const RATE_LIMIT_MINUTES = 5;
+// process.env.AWS_REGION
+const client = new CognitoIdentityProviderClient({ region: "ap-northeast-2" });
 
-const sanitizeUser = (user) => ({
-  id: user.user_id || user.id,
-  email: user.email,
-  nickname: user.nickname,
-});
+const CLIENT_ID = process.env.COGNITO_CLIENT_ID;
+const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
+
+// Helper to map Cognito errors to ServerError
+const handleCognitoError = (err) => {
+  logger.error('Cognito Error', { name: err.name, message: err.message });
+  switch (err.name) {
+    case 'UsernameExistsException':
+      throw new ServerError(ERROR_CODES.EMAIL_ALREADY_EXISTS, 409);
+    case 'UserNotFoundException':
+      throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
+    case 'NotAuthorizedException':
+      throw new ServerError(ERROR_CODES.INVALID_CREDENTIALS, 401, { message: '아이디 또는 비밀번호가 잘못되었습니다.' });
+    case 'CodeMismatchException':
+      throw new ServerError(ERROR_CODES.INVALID_VERIFICATION_CODE, 400);
+    case 'ExpiredCodeException':
+      throw new ServerError(ERROR_CODES.INVALID_VERIFICATION_CODE, 400, { message: '인증 코드가 만료되었습니다.' });
+    case 'LimitExceededException':
+      throw new ServerError(ERROR_CODES.RATE_LIMIT_EXCEEDED, 429);
+    case 'InvalidParameterException':
+        throw new ServerError(ERROR_CODES.VALIDATION_FAILED, 400, { message: err.message });
+    case 'UserNotConfirmedException':
+        throw new ServerError(ERROR_CODES.UNAUTHORIZED, 401, { message: '이메일 인증이 완료되지 않았습니다.' });
+    default:
+      throw new ServerError(ERROR_CODES.UNEXPECTED_ERROR, 500, { originalError: err.message });
+  }
+};
 
 async function register(body) {
   const validation = registerSchema.safeParse(body);
@@ -40,33 +60,48 @@ async function register(body) {
 
   const { email, password, nickname } = body;
 
-  const { Items: existingUsers } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.USER,
-      IndexName: 'EmailIndex',
-      KeyConditionExpression: 'email = :email',
-      ExpressionAttributeValues: { ':email': email },
-    })
-  );
+  try {
+    // 1. Sign up with Cognito
+    const signUpCommand = new SignUpCommand({
+      ClientId: CLIENT_ID,
+      Username: email,
+      Password: password,
+      UserAttributes: [
+        { Name: 'email', Value: email },
+        { Name: 'nickname', Value: nickname || '' },
+      ],
+    });
 
-  if (existingUsers && existingUsers.length > 0) {
-    logger.warn('Registration failed: email already exists', { email });
-    throw new ServerError(ERROR_CODES.EMAIL_ALREADY_EXISTS, 409);
-  }
+    const signUpResponse = await client.send(signUpCommand);
+    const userSub = signUpResponse.UserSub;
 
-  const userId = uuidv4();
-  const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
-  const now = new Date().toISOString();
+    // 2. Auto-confirm user and mark email as verified (Admin bypass)
+    try {
+      await client.send(new AdminConfirmSignUpCommand({
+        UserPoolId: USER_POOL_ID,
+        Username: email,
+      }));
+      
+      await client.send(new AdminUpdateUserAttributesCommand({
+        UserPoolId: USER_POOL_ID,
+        Username: email,
+        UserAttributes: [
+          { Name: 'email_verified', Value: 'true' }
+        ]
+      }));
 
-  const { accessToken, refreshToken, refreshTokenPayload } =
-    await generateTokens({ id: userId, email, nickname });
+      logger.info('User auto-confirmed and email verified via Admin commands', { email });
+    } catch (confirmErr) {
+      logger.error('Failed to auto-confirm user or verify email', { error: confirmErr.message, email });
+    }
 
-  const transactItems = [
-    {
-      Put: {
+    // 3. Save user profile to DynamoDB "USER" Table
+    const now = new Date().toISOString();
+    await docClient.send(
+      new PutCommand({
         TableName: TABLES.USER,
         Item: {
-          user_id: userId,
+          user_id: userSub,
           sort_key: 'USER_INFO_ITEM',
           email,
           nickname: nickname || null,
@@ -80,37 +115,20 @@ async function register(body) {
           allow_location_storage: false,
         },
         ConditionExpression: 'attribute_not_exists(user_id)',
-      },
-    },
-    {
-      Put: {
-        TableName: TABLES.AUTH_DATA,
-        Item: {
-          user_id: userId,
-          sort_key: 'PASSWORD_ITEM',
-          password_hash: passwordHash,
-          created_at: now,
-          updated_at: now,
-        },
-      },
-    },
-    {
-      Put: {
-        TableName: TABLES.AUTH_DATA,
-        Item: refreshTokenPayload,
-      },
-    },
-  ];
+      })
+    );
 
-  await docClient.send(new TransactWriteCommand({ TransactItems: transactItems }));
+    logger.info('User registered in Cognito and DynamoDB', { userId: userSub, email });
 
-  logger.info('User registered', { userId, email });
+    return {
+      message: '회원가입이 완료되었습니다.',
+      user: { id: userSub, email, nickname },
+      userConfirmed: true, 
+    };
 
-  return {
-    accessToken,
-    refreshToken,
-    user: { id: userId, email, nickname },
-  };
+  } catch (err) {
+    handleCognitoError(err);
+  }
 }
 
 async function login(body) {
@@ -123,98 +141,50 @@ async function login(body) {
 
   const { email, password } = body;
 
-  const { Items: users } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.USER,
-      IndexName: 'EmailIndex',
-      KeyConditionExpression: 'email = :email',
-      ExpressionAttributeValues: { ':email': email },
-    })
-  );
-
-  const userProfile = users && users.length > 0 ? users[0] : null;
-
-  if (!userProfile || userProfile.is_active === false) {
-    logger.warn('Login failed: user not found or inactive', { email });
-    throw new ServerError(ERROR_CODES.INVALID_CREDENTIALS, 401);
-  }
-
-  const userId = userProfile.user_id;
-
-  const { Item: authData } = await docClient.send(
-    new GetCommand({
-      TableName: TABLES.AUTH_DATA,
-      Key: { user_id: userId, sort_key: 'PASSWORD_ITEM' },
-    })
-  );
-
-  if (!authData || !authData.password_hash) {
-    logger.warn('Login failed: no password data', { userId });
-    throw new ServerError(ERROR_CODES.INVALID_CREDENTIALS, 401);
-  }
-
-  const isPasswordValid = await bcrypt.compare(password, authData.password_hash);
-  if (!isPasswordValid) {
-    logger.warn('Login failed: password mismatch', { userId, email });
-    throw new ServerError(ERROR_CODES.INVALID_CREDENTIALS, 401);
-  }
-
-  const { accessToken, refreshToken, refreshTokenPayload } =
-    await generateTokens({
-      id: userId,
-      email: userProfile.email,
-      nickname: userProfile.nickname,
+  try {
+    const command = new InitiateAuthCommand({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: CLIENT_ID,
+      AuthParameters: {
+        USERNAME: email,
+        PASSWORD: password,
+      },
     });
 
-  await docClient.send(
-    new PutCommand({
-      TableName: TABLES.AUTH_DATA,
-      Item: refreshTokenPayload,
-    })
-  );
-
-  logger.info('User logged in', { userId, email });
-
-  return {
-    accessToken,
-    refreshToken,
-    user: sanitizeUser(userProfile),
-  };
-}
-
-async function logout(userId) {
-  const { Items: activeTokens } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.AUTH_DATA,
-      KeyConditionExpression: 'user_id = :uid AND begins_with(sort_key, :prefix)',
-      FilterExpression: 'attribute_not_exists(revoked_at)',
-      ExpressionAttributeValues: {
-        ':uid': userId,
-        ':prefix': 'TOKEN#',
-      },
-    })
-  );
-
-  let invalidatedCount = 0;
-
-  if (activeTokens && activeTokens.length > 0) {
-    const updatePromises = activeTokens.map((token) =>
-      docClient.send(
-        new UpdateCommand({
-          TableName: TABLES.AUTH_DATA,
-          Key: { user_id: userId, sort_key: token.sort_key },
-          UpdateExpression: 'set revoked_at = :now',
-          ExpressionAttributeValues: { ':now': new Date().toISOString() },
+    const response = await client.send(command);
+    const result = response.AuthenticationResult;
+    
+    // Fetch user profile from DynamoDB to return consistent response structure
+    // We need the userSub (from IdToken or AccessToken) but we don't parse it here easily without a library.
+    // Instead, we query by email index to get the user profile.
+    const { Items: users } = await docClient.send(
+        new QueryCommand({
+          TableName: TABLES.USER,
+          IndexName: 'EmailIndex',
+          KeyConditionExpression: 'email = :email',
+          ExpressionAttributeValues: { ':email': email },
         })
-      )
-    );
+      );
+    
+    const userProfile = users && users.length > 0 ? users[0] : null;
 
-    await Promise.all(updatePromises);
-    invalidatedCount = activeTokens.length;
+    logger.info('User logged in via Cognito', { email });
+
+    return {
+      accessToken: result.AccessToken,
+      refreshToken: result.RefreshToken,
+      idToken: result.IdToken,
+      expiresIn: result.ExpiresIn,
+      user: userProfile ? {
+          id: userProfile.user_id,
+          email: userProfile.email,
+          nickname: userProfile.nickname
+      } : { email } // Fallback if DB sync failed or pending
+    };
+
+  } catch (err) {
+    handleCognitoError(err);
   }
-
-  logger.info('User logged out', { userId, invalidatedCount });
-  return { message: '로그아웃이 성공적으로 완료되었습니다.' };
 }
 
 async function refreshToken(body) {
@@ -226,77 +196,55 @@ async function refreshToken(body) {
   }
 
   const { refreshToken } = body;
-  const requestTokenHash = hashToken(refreshToken);
 
-  const { Items: tokens } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.AUTH_DATA,
-      IndexName: 'TokenHashIndex',
-      KeyConditionExpression: 'token_hash = :hash',
-      FilterExpression: 'attribute_not_exists(revoked_at) AND expires_at > :now',
-      ExpressionAttributeValues: {
-        ':hash': requestTokenHash,
-        ':now': new Date().toISOString(),
+  try {
+    const command = new InitiateAuthCommand({
+      AuthFlow: 'REFRESH_TOKEN_AUTH',
+      ClientId: CLIENT_ID,
+      AuthParameters: {
+        REFRESH_TOKEN: refreshToken,
       },
-    })
-  );
+    });
 
-  const storedToken = tokens && tokens.length > 0 ? tokens[0] : null;
+    const response = await client.send(command);
+    const result = response.AuthenticationResult;
 
-  if (!storedToken) {
-    logger.warn('Refresh token validation failed');
-    throw new ServerError(ERROR_CODES.TOKEN_EXPIRED, 403);
+    logger.info('Token refreshed via Cognito');
+
+    return {
+      accessToken: result.AccessToken,
+      idToken: result.IdToken,
+      expiresIn: result.ExpiresIn,
+      // Cognito may not return a new Refresh Token unless the old one is rotating
+      refreshToken: result.RefreshToken || undefined 
+    };
+
+  } catch (err) {
+    handleCognitoError(err);
+  }
+}
+
+async function logout(accessToken) {
+  if (!accessToken) {
+      // If no access token is provided, we can't globally sign out via API.
+      // Client should just discard tokens.
+      return { message: '로그아웃 되었습니다. (클라이언트 토큰 삭제 필요)' };
   }
 
-  const userId = storedToken.user_id;
+  try {
+    const command = new GlobalSignOutCommand({
+      AccessToken: accessToken,
+    });
 
-  const { Item: userProfile } = await docClient.send(
-    new GetCommand({
-      TableName: TABLES.USER,
-      Key: { user_id: userId, sort_key: 'USER_INFO_ITEM' },
-    })
-  );
+    await client.send(command);
+    logger.info('User globally signed out from Cognito');
+    return { message: '로그아웃이 성공적으로 완료되었습니다.' };
 
-  if (!userProfile || userProfile.is_active === false) {
-    logger.warn('Token refresh failed: user not found or inactive', { userId });
-    throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 403);
+  } catch (err) {
+    // If token is invalid/expired, we still consider it "logged out" for the client
+    logger.warn('Logout failed (token might be invalid)', { error: err.message });
+    return { message: '로그아웃 되었습니다.' };
   }
-
-  const {
-    accessToken: newAccessToken,
-    refreshToken: newRefreshToken,
-    refreshTokenPayload,
-  } = await generateTokens({
-    id: userProfile.user_id,
-    email: userProfile.email,
-    nickname: userProfile.nickname,
-  });
-
-  const transactItems = [
-    {
-      Update: {
-        TableName: TABLES.AUTH_DATA,
-        Key: { user_id: userId, sort_key: storedToken.sort_key },
-        UpdateExpression: 'set revoked_at = :now',
-        ExpressionAttributeValues: { ':now': new Date().toISOString() },
-      },
-    },
-    {
-      Put: {
-        TableName: TABLES.AUTH_DATA,
-        Item: refreshTokenPayload,
-      },
-    },
-  ];
-
-  await docClient.send(new TransactWriteCommand({ TransactItems: transactItems }));
-
-  logger.info('Token refreshed', { userId });
-
-  return {
-    accessToken: newAccessToken,
-    refreshToken: newRefreshToken,
-  };
 }
 
 async function forgotPasswordSend(body) {
@@ -309,109 +257,25 @@ async function forgotPasswordSend(body) {
 
   const { email } = body;
 
-  const { Items: users } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.USER,
-      IndexName: 'EmailIndex',
-      KeyConditionExpression: 'email = :email',
-      ExpressionAttributeValues: { ':email': email },
-    })
-  );
-
-  const user = users && users.length > 0 ? users[0] : null;
-
-  if (!user) {
-    logger.warn('Forgot password failed: user not found', { email });
-    throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
-  }
-
-  const userId = user.user_id;
-
-  const { Items: resetRequests } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.AUTH_DATA,
-      KeyConditionExpression: 'user_id = :uid AND begins_with(sort_key, :prefix)',
-      ExpressionAttributeValues: {
-        ':uid': userId,
-        ':prefix': 'RESET#',
-      },
-    })
-  );
-
-  if (resetRequests && resetRequests.length > 0) {
-    resetRequests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    const lastRequest = resetRequests[0];
-    const timeDiff = Date.now() - new Date(lastRequest.created_at).getTime();
-    const limitMs = RATE_LIMIT_MINUTES * 60 * 1000;
-
-    if (timeDiff < limitMs) {
-      const waitTimeSeconds = Math.ceil((limitMs - timeDiff) / 1000);
-      throw new ServerError(ERROR_CODES.RATE_LIMIT_EXCEEDED, 429, {
-        message: `비밀번호 재설정 요청은 ${RATE_LIMIT_MINUTES}분에 1회만 가능합니다.`,
-        retryAfter: waitTimeSeconds,
-      });
-    }
-  }
-
-  const code = crypto.randomInt(100000, 999999).toString();
-  const expiresAt = new Date(
-    Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000
-  ).toISOString();
-  const now = new Date().toISOString();
-
-  const transactItems = [];
-
-  const activeRequests = resetRequests
-    ? resetRequests.filter((r) => r.consumed === false)
-    : [];
-
-  if (activeRequests.length > 0) {
-    activeRequests.forEach((req) => {
-      transactItems.push({
-        Update: {
-          TableName: TABLES.AUTH_DATA,
-          Key: { user_id: userId, sort_key: req.sort_key },
-          UpdateExpression: 'set #c = :true, updated_at = :now',
-          ExpressionAttributeNames: { '#c': 'consumed' },
-          ExpressionAttributeValues: { ':true': true, ':now': now },
-        },
-      });
-    });
-  }
-
-  transactItems.push({
-    Put: {
-      TableName: TABLES.AUTH_DATA,
-      Item: {
-        user_id: userId,
-        sort_key: `RESET#${code}`,
-        code,
-        expires_at: expiresAt,
-        created_at: now,
-        consumed: false,
-        type: 'RESET_CODE',
-      },
-    },
-  });
-
-  await docClient.send(new TransactWriteCommand({ TransactItems: transactItems }));
-
   try {
-    await sendPasswordResetEmail({ toEmail: user.email, code });
-    logger.info('Password reset email sent', { userId });
-  } catch (emailError) {
-    logger.error('Email send failed', { error: emailError.message });
+    const command = new ForgotPasswordCommand({
+      ClientId: CLIENT_ID,
+      Username: email,
+    });
+
+    await client.send(command);
+    logger.info('Password reset code sent via Cognito', { email });
+    return { message: '해당 이메일로 비밀번호 재설정 코드가 전송되었습니다.' };
+
+  } catch (err) {
+    handleCognitoError(err);
   }
-
-  logger.info('[Dev] Password reset code', { userId, code });
-
-  return { message: '해당 이메일로 비밀번호 재설정 코드가 전송되었습니다.' };
 }
 
 async function forgotPasswordVerify(body) {
   const { z } = require('zod');
   const verifySchema = forgotPasswordSchema.extend({
-    code: z.string().length(6, '인증 코드는 6자리여야 합니다.'),
+    code: z.string().min(1, '인증 코드를 입력해주세요.'),
     newPassword: z.string().min(8, '비밀번호는 최소 8자 이상이어야 합니다.'),
   });
 
@@ -424,66 +288,20 @@ async function forgotPasswordVerify(body) {
 
   const { email, code, newPassword } = body;
 
-  const { Items: users } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.USER,
-      IndexName: 'EmailIndex',
-      KeyConditionExpression: 'email = :email',
-      ExpressionAttributeValues: { ':email': email },
-    })
-  );
-
-  const user = users && users.length > 0 ? users[0] : null;
-
-  if (!user) {
-    throw new ServerError(ERROR_CODES.USER_NOT_FOUND, 404);
-  }
-
-  const userId = user.user_id;
-  const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
-  const now = new Date().toISOString();
-
   try {
-    const transactParams = {
-      TransactItems: [
-        {
-          Update: {
-            TableName: TABLES.AUTH_DATA,
-            Key: { user_id: userId, sort_key: `RESET#${code}` },
-            UpdateExpression: 'set #c = :true, verified_at = :now',
-            ConditionExpression: '#c = :false AND expires_at > :now',
-            ExpressionAttributeNames: { '#c': 'consumed' },
-            ExpressionAttributeValues: {
-              ':true': true,
-              ':false': false,
-              ':now': now,
-            },
-          },
-        },
-        {
-          Update: {
-            TableName: TABLES.AUTH_DATA,
-            Key: { user_id: userId, sort_key: 'PASSWORD_ITEM' },
-            UpdateExpression: 'set password_hash = :hash, updated_at = :now',
-            ExpressionAttributeValues: {
-              ':hash': newPasswordHash,
-              ':now': now,
-            },
-          },
-        },
-      ],
-    };
+    const command = new ConfirmForgotPasswordCommand({
+      ClientId: CLIENT_ID,
+      Username: email,
+      ConfirmationCode: code,
+      Password: newPassword,
+    });
 
-    await docClient.send(new TransactWriteCommand(transactParams));
-
-    logger.info('Password reset successful', { userId });
+    await client.send(command);
+    logger.info('Password reset confirmed via Cognito', { email });
     return { message: '비밀번호가 성공적으로 재설정되었습니다.' };
+
   } catch (err) {
-    if (err.name === 'TransactionCanceledException') {
-      logger.warn('Password reset failed: invalid/expired code', { email });
-      throw new ServerError(ERROR_CODES.INVALID_VERIFICATION_CODE, 400);
-    }
-    throw err;
+    handleCognitoError(err);
   }
 }
 

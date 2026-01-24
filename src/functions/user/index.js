@@ -3,16 +3,14 @@ const { success, error } = require('../../utils/response');
 const { ServerError, ERROR_CODES } = require('../../utils/error');
 const userService = require('../../services/userService');
 const { validateBody, updateLocationSchema, logWalkSchema } = require('../../utils/validation');
+const { requireUserId } = require('../../utils/auth');
 
 exports.handler = async (event) => {
   const routeKey = event.routeKey;
   logger.info('User domain handler invoked', { routeKey });
 
   try {
-    const userId = event.requestContext?.authorizer?.lambda?.userId;
-    if (!userId) {
-      throw new ServerError(ERROR_CODES.UNAUTHORIZED, 401);
-    }
+    const userId = requireUserId(event);
 
     const body = event.body ? JSON.parse(event.body) : {};
     const pathParameters = event.pathParameters || {};

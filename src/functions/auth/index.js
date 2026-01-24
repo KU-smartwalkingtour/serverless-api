@@ -2,6 +2,7 @@ const { logger } = require('../../utils/logger');
 const { success, error } = require('../../utils/response');
 const { ServerError, ERROR_CODES } = require('../../utils/error');
 const authService = require('../../services/authService');
+const { getAccessToken, getUserId } = require('../../utils/auth');
 
 exports.handler = async (event) => {
   // API Gateway V2의 routeKey (예: "POST /auth/login")
@@ -11,7 +12,7 @@ exports.handler = async (event) => {
 
   try {
     const body = event.body ? JSON.parse(event.body) : {};
-    const userId = event.requestContext?.authorizer?.lambda?.userId;
+    const userId = getUserId(event);
 
     let result;
     let statusCode = 200;
@@ -31,10 +32,11 @@ exports.handler = async (event) => {
         break;
 
       case 'POST /auth/logout':
-        if (!userId) {
-          throw new ServerError(ERROR_CODES.UNAUTHORIZED, 401);
+        const accessToken = getAccessToken(event);
+        if (!accessToken) {
+             throw new ServerError(ERROR_CODES.UNAUTHORIZED, 401, { message: '토큰이 필요합니다.' });
         }
-        result = await authService.logout(userId);
+        result = await authService.logout(accessToken);
         break;
 
       case 'POST /auth/forgot-password/send':

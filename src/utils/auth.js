@@ -1,57 +1,55 @@
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const { logger } = require('./logger');
+const { ServerError, ERROR_CODES } = require('./error');
 
-const ACCESS_TOKEN_EXPIRY = '1h';
-const REFRESH_TOKEN_BYTES = 64;
-const REFRESH_TOKEN_DAYS = 14;
-
-const validateEnvironment = () => {
-  if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET environment variable is not configured');
+/**
+ * Extracts the user ID (sub) from the API Gateway event context.
+ * Supports both Cognito JWT Authorizer and Legacy Lambda Authorizer.
+ * @param {object} event - The Lambda event object
+ * @returns {string|null} - The user ID or null if not found
+ */
+const getUserId = (event) => {
+  // 1. Cognito JWT Authorizer (standard)
+  if (event.requestContext?.authorizer?.jwt?.claims?.sub) {
+    return event.requestContext.authorizer.jwt.claims.sub;
   }
-};
-
-const hashToken = (token) => {
-  return crypto.createHash('sha256').update(token).digest('hex');
-};
-
-const generateTokens = async (user) => {
-  try {
-    validateEnvironment();
-
-    if (!user || !user.id) {
-      throw new Error('Invalid user object: user.id is required');
-    }
-
-    const accessToken = jwt.sign(
-      { id: user.id, email: user.email, nickname: user.nickname },
-      process.env.JWT_SECRET,
-      { expiresIn: ACCESS_TOKEN_EXPIRY }
-    );
-
-    const refreshToken = crypto.randomBytes(REFRESH_TOKEN_BYTES).toString('hex');
-    const tokenHash = hashToken(refreshToken);
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_DAYS);
-
-    const refreshTokenPayload = {
-      user_id: user.id,
-      sort_key: `TOKEN#${tokenHash}`,
-      token_hash: tokenHash,
-      created_at: new Date().toISOString(),
-      expires_at: expiresAt.toISOString(),
-      revoked_at: undefined,
-    };
-
-    logger.debug(`토큰 생성 완료 - 사용자 ID: ${user.id}`);
-
-    return { accessToken, refreshToken, refreshTokenPayload };
-  } catch (error) {
-    logger.error(`토큰 생성 실패: ${error.message}`, { userId: user?.id });
-    throw error;
+  
+  // 2. Legacy Lambda Authorizer (if any)
+  if (event.requestContext?.authorizer?.lambda?.userId) {
+    return event.requestContext.authorizer.lambda.userId;
   }
+
+  return null;
 };
 
-module.exports = { generateTokens, hashToken };
+/**
+ * Extracts the user ID or throws UNAUTHORIZED if missing.
+ * @param {object} event 
+ * @returns {string} User ID
+ */
+const requireUserId = (event) => {
+  const userId = getUserId(event);
+  if (!userId) {
+    throw new ServerError(ERROR_CODES.UNAUTHORIZED, 401);
+  }
+  return userId;
+};
+
+/**
+ * Extracts the Bearer token from the Authorization header.
+ * @param {object} event - The Lambda event object
+ * @returns {string|null} - The access token or null
+ */
+const getAccessToken = (event) => {
+  const authHeader = event.headers?.authorization || event.headers?.Authorization;
+  if (!authHeader) return null;
+  
+  if (authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7);
+  }
+  return authHeader;
+};
+
+module.exports = {
+  getUserId,
+  requireUserId,
+  getAccessToken
+};

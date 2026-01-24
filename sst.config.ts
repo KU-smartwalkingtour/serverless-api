@@ -25,6 +25,36 @@ export default $config({
     };
 
     // ==========================================================================
+    // Cognito User Pool
+    // ==========================================================================
+    const userPool = new sst.aws.CognitoUserPool("UserPool", {
+      usernames: ["email"],
+      transform: {
+        userPool: {
+          autoVerifiedAttributes: [],
+          // SES 이용하여 이메일 보내기 
+          // https://www.pulumi.com/registry/packages/aws/api-docs/cognito/userpool/#userpoolemailconfiguration
+          emailConfiguration: {
+            emailSendingAccount: "DEVELOPER",
+            fromEmailAddress: "KU 둘레길 <no-reply@ku-smartwalkingtour.site>",
+            sourceArn: `arn:aws:ses:ap-northeast-2:${process.env.AWS_ACCOUNT_ID!}:identity/ku-smartwalkingtour.site`
+          },
+        },
+      },
+    });
+
+    const userPoolClient = userPool.addClient("UserPoolClient", {
+      transform: {
+        client: {
+          explicitAuthFlows: [
+            "ALLOW_USER_PASSWORD_AUTH",
+            "ALLOW_REFRESH_TOKEN_AUTH",
+          ],
+        },
+      },
+    });
+
+    // ==========================================================================
     // Environment Variables
     // ==========================================================================
     const commonEnv = {
@@ -32,7 +62,9 @@ export default $config({
     };
 
     const authEnv = {
-      ...commonEnv
+      ...commonEnv,
+      COGNITO_USER_POOL_ID: userPool.id,
+      COGNITO_CLIENT_ID: userPoolClient.id,
     };
 
     const weatherEnv = {
@@ -87,6 +119,14 @@ export default $config({
         `${dynamoDbArns.userCourseTable}/index/*`,
       ],
     };
+    
+    // ==========================================================================
+    // Cognito Permission
+    // ==========================================================================
+    const cognitoPermissions = {
+      actions: ["cognito-idp:*"],
+      resources: ["*"],
+    };
 
     // ==========================================================================
     // SES Permission (Email)
@@ -118,21 +158,12 @@ export default $config({
       ],
     };
 
-    // Lambda Authorizer 설정
+    // Cognito Authorizer 설정
     const jwtAuth = api.addAuthorizer({
-      name: "jwt-authorizer",
-      lambda: {
-        function: {
-          handler: "src/functions/authorizer/index.handler",
-          memory: "128 MB",
-          timeout: "5 seconds",
-          permissions: [dynamoDbPermissions],
-          environment: {
-            ...commonEnv,
-            JWT_SECRET: process.env.JWT_SECRET!,
-          },
-          nodejs: nodejsConfig,
-        },
+      name: "user-pool-authorizer",
+      jwt: {
+        audiences: [userPoolClient.id],
+        issuer: $interpolate`https://cognito-idp.ap-northeast-2.amazonaws.com/${userPool.id}`,
       },
     });
 
@@ -145,7 +176,7 @@ export default $config({
       handler: "src/functions/auth/index.handler",
       memory: "256 MB" as const,
       timeout: "10 seconds" as const,
-      permissions: [dynamoDbPermissions, sesPermissions],
+      permissions: [dynamoDbPermissions, sesPermissions, cognitoPermissions],
       environment: authEnv,
       nodejs: nodejsConfig,
     });
@@ -204,7 +235,9 @@ export default $config({
       authFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -217,7 +250,9 @@ export default $config({
       weatherFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -227,7 +262,9 @@ export default $config({
       weatherFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -237,7 +274,9 @@ export default $config({
       weatherFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -250,7 +289,9 @@ export default $config({
       coursesFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -260,7 +301,9 @@ export default $config({
       coursesFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -270,7 +313,9 @@ export default $config({
       coursesFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -280,7 +325,9 @@ export default $config({
       coursesFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -293,7 +340,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -303,7 +352,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -313,7 +364,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -323,7 +376,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -336,7 +391,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -346,7 +403,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -356,7 +415,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -369,7 +430,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -379,7 +442,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -389,7 +454,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -402,7 +469,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -412,7 +481,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -422,7 +493,9 @@ export default $config({
       userFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );
@@ -435,7 +508,9 @@ export default $config({
       medicalFunction.arn,
       {
         auth: {
-          lambda: jwtAuth.id,
+          jwt: {
+            authorizer: jwtAuth.id,
+          },
         },
       }
     );

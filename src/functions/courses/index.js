@@ -2,6 +2,7 @@ const { logger } = require('../../utils/logger');
 const { success, error } = require('../../utils/response');
 const { ServerError, ERROR_CODES } = require('../../utils/error');
 const coursesService = require('../../services/coursesService');
+const { getUserId } = require('../../utils/auth');
 
 exports.handler = async (event) => {
   const routeKey = event.routeKey;
@@ -9,7 +10,8 @@ exports.handler = async (event) => {
 
   try {
     const query = event.queryStringParameters || {};
-    const userId = event.requestContext?.authorizer?.lambda?.userId;
+    // UserId is optional for some course operations (e.g. public view), but used for personalization if present
+    const userId = getUserId(event);
     const pathParameters = event.pathParameters || {};
     const courseId = pathParameters.courseId;
 

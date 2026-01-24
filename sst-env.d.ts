@@ -5,6 +5,43 @@
 
 declare module "sst" {
   export interface Resource {
+    "AlarmTopic": {
+      "arn": string
+      "type": "sst.aws.SnsTopic"
+    }
+    "Api": {
+      "type": "sst.aws.ApiGatewayV2"
+      "url": string
+    }
+    "AuthFunction": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "CoursesFunction": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "MedicalFunction": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "UserFunction": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
+    "UserPool": {
+      "id": string
+      "type": "sst.aws.CognitoUserPool"
+    }
+    "UserPoolClient": {
+      "id": string
+      "secret": string
+      "type": "sst.aws.CognitoUserPoolClient"
+    }
+    "WeatherFunction": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
   }
 }
 /// <reference path="sst-env.d.ts" />
