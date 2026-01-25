@@ -3,7 +3,8 @@ name: Deploy Serverless API
 on:
   push:
     branches:
-      - refactor/sst
+      - none
+      # - refactor/sst
 
 env:
   AWS_REGION: ap-northeast-2

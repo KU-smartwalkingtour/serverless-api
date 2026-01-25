@@ -58,7 +58,7 @@ export default $config({
     // Environment Variables
     // ==========================================================================
     const commonEnv = {
-      JWT_SECRET: process.env.JWT_SECRET!
+      // JWT_SECRET // removed as we use Cognito Authorizer
     };
 
     const authEnv = {
