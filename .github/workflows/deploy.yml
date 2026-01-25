@@ -1,78 +1,85 @@
-name: Deploy to EC2
+name: Deploy Serverless API
 
 on:
   push:
     branches:
-      - deploy/prod
-  pull_request:
-    branches:
-      - deploy/prod
+      - none
+      # - refactor/sst
 
 env:
-  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/ku-smartwalkingtour
-  DOCKER_TAG: latest
-  SECRET_ID: ku-swt/env
   AWS_REGION: ap-northeast-2
+  NODE_VERSION: 20
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          install: true
-          driver: docker-container
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   deploy:
-    needs: build-and-push
+    name: Deploy with SST
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
     steps:
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@master
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            APP_DIR=/home/ec2-user/app
-            CONTAINER_NAME=ku-swt-container
-            NETWORK_NAME=server-network
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
 
-            # 생성하는 파일의 권한은 반드시 600임을 보장.
-            umask 077
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
 
-            # .env 값을 가져옴.
-            sudo aws secretsmanager get-secret-value \
-              --secret-id "${{ env.SECRET_ID }}" \
-              --region "${{ env.AWS_REGION }}" \
-              --query SecretString \
-              --output text > "${APP_DIR}/.env"
+      - name: Install Layer dependencies
+        run: |
+          cd src/layers/common/nodejs
+          yarn install --production --frozen-lockfile
 
-            sudo docker stop "${CONTAINER_NAME}" || true
-            sudo docker rm "${CONTAINER_NAME}" || true
-            sudo docker pull ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
-            sudo docker run -d \
-              --name "${CONTAINER_NAME}" \
-              --network "${NETWORK_NAME}" \
-              -v "${APP_DIR}/.env:/usr/src/app/.env:ro" \
-              ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publish Lambda Layer
+        id: publish-layer
+        run: |
+          cd src/layers/common/nodejs
+          yarn install --production --frozen-lockfile
+          cd ..
+          zip -r common-layer.zip nodejs
+          
+          echo "Publishing Lambda Layer..."
+          LAYER_VERSION_ARN=$(aws lambda publish-layer-version \
+            --layer-name ku-swt-common-layer \
+            --description "Common Layer for KU SWT (Commit: ${{ github.sha }})" \
+            --zip-file fileb://common-layer.zip \
+            --compatible-runtimes nodejs20.x \
+            --output text \
+            --query LayerVersionArn)
+          
+          echo "LAYER_ARN=$LAYER_VERSION_ARN" >> $GITHUB_ENV
+          echo "Published Layer ARN: $LAYER_VERSION_ARN"
+
+      - name: Update sst.config.ts with new Layer ARN
+        run: |
+          sed -i "s|const commonLayerArn = \".*\";|const commonLayerArn = \"${{ env.LAYER_ARN }}\";|g" sst.config.ts
+          cat sst.config.ts | grep "const commonLayerArn"
+
+      - name: Create .env file for SST
+        run: |
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "KMA_API_KEY=${{ secrets.KMA_API_KEY }}" >> .env
+          echo "AIRKOREA_API_KEY=${{ secrets.AIRKOREA_API_KEY }}" >> .env
+          echo "DURUNUBI_SERVICE_KEY=${{ secrets.DURUNUBI_SERVICE_KEY }}" >> .env
+          echo "SEOUL_TRAIL_API_KEY=${{ secrets.SEOUL_TRAIL_API_KEY }}" >> .env
+          echo "NMC_HOSPITAL_KEY=${{ secrets.NMC_HOSPITAL_KEY }}" >> .env
+
+      - name: Deploy to AWS (Production)
+        run: node -r dotenv/config node_modules/.bin/sst deploy --stage production
+
+      - name: Deployment Summary
+        run: |
+          echo "## Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** production" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

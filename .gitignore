@@ -1,8 +1,17 @@
 # Dependencies
 /node_modules
+src/layers/common/nodejs/node_modules
+src/layers/common/nodejs/yarn.lock
+
+# Lambda layer zip
+src/layers/common-layer.zip
+src/layers/common/common-layer.zip
 
 # Build output
 /dist
+
+# SST
+.sst/
 
 # gpx file directory
 gpx_files
@@ -23,3 +32,9 @@ yarn-error.log*
 
 # Claude
 CLAUDE.md
+
+# Gemini
+.gemini/
+
+# test
+test.json
