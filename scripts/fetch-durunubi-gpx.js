@@ -2,7 +2,7 @@
  * @fileoverview Durunubi GPX Data Fetcher
  *
  * 한국관광공사가 제공하는 "두루누비 정보 서비스_GW" API를 사용하여
- * 전국 순환형 트래킹 코스 '코리아둘레길'의 284개 코스 목록을 전체 순회(Pagination)하고 GPX 파일을 수집하는 스크립트이다.
+ * 전국 순환형 트래킹 코스 '코리아둘레길'의 코스 목록을 전체 순회(Pagination)하고 GPX 파일을 수집하는 스크립트이다.
  *
  * --------------------------------------------------------------------------------
  * [Target API Information]
@@ -13,10 +13,16 @@
  *
  * [Data Processing Strategy]
  * 1. Pagination: 'numOfRows'와 'totalCount'를 기반으로 마지막 페이지까지 자동 순회.
- * 2. Extraction: 응답 데이터(JSON)에서 다음 두 가지 핵심 필드를 추출.
- * - `crsIdx` (코스 ID): 파일명으로 사용하여 중복 방지 및 식별 (e.g., "T_CRS_...5116.gpx").
- * - `gpxpath` (파일 경로): 실제 GPX 데이터를 다운로드할 원격 URL.
- * 3. Storage: 추출한 URL에서 텍스트 데이터를 받아 로컬 디렉토리에 저장.
+ * 2. Extraction: 응답 데이터(JSON)에서 다음 필드들을 추출하여 활용.
+ *    - `crsIdx`: 코스 고유 ID. 파일명 생성 및 식별에 사용.
+ *    - `gpxpath`: 실제 GPX 데이터를 다운로드할 원격 URL.
+ * 3. Storage: 추출한 URL에서 XML/GPX 데이터를 받아 로컬 `gpx_files/durunubi/` 폴더에 저장.
+ * --------------------------------------------------------------------------------
+ *
+ * [Required Environment Variables]
+ * - `DURUNUBI_SERVICE_KEY`: 두루누비 API 인증 키
+ * - `LOG_LEVEL`: (Optional) 로그 레벨 (default: info)
+ * - `NODE_ENV`: (Optional) 실행 환경 (development/production)
  * --------------------------------------------------------------------------------
  *
  * @see {@link https://www.data.go.kr/data/15101974/openapi.do#/API%20%EB%AA%A9%EB%A1%9D/courseList | 한국관광공사_두루누비 정보 서비스_GW API 문서}
@@ -29,11 +35,16 @@
 
 /**
  * 공공데이터포털 두루누비 정보 서비스 코스 목록 정보 조회 API Response Item Schema
- * * @typedef {Object} CourseItem
- * @property {string} crsIdx - Course Unique ID (Used as filename, e.g., "T_CRS_MNG0000005116")
- * @property {string} gpxpath - Remote URL for the GPX file
- * @property {string} crsKorNm - Course Name (e.g., "남파랑길 1코스")
- * @property {string} [modifiedtime] - Last modification time
+ * @typedef {Object} CourseItem
+ * @property {string} crsIdx - 코스 고유 식별자 (e.g., "T_CRS_MNG0000005116")
+ * @property {string} crsKorNm - 코스 명칭 (e.g., "남파랑길 1코스")
+ * @property {string} crsDstnc - 코스 총 거리 (km)
+ * @property {string} crsTotlRqrmHour - 코스 총 소요 시간 (분)
+ * @property {string} crsLevel - 난이도 코드 (1: 하, 2: 중, 3: 상)
+ * @property {string} crsContents - 코스 설명/내용
+ * @property {string} sigun - 소재지 시군구 명칭
+ * @property {string} gpxpath - GPX 파일 다운로드 경로 (핵심 수집 대상)
+ * @property {string} [modifiedtime] - 최종 수정 시각
  */
 
 require('dotenv').config();
