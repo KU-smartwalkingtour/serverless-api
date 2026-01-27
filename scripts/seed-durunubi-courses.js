@@ -3,14 +3,23 @@ const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
 const gpxParse = require('gpx-parse');
-const Course = require('@models/course'); // 변경: Course 모델 사용
-const sequelize = require('@config/database');
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
 
 // --- Configuration ---
 const SERVICE_KEY = process.env.DURUNUBI_SERVICE_KEY;
 const API_BASE_URL = 'https://apis.data.go.kr/B551011/Durunubi/courseList';
 const NUM_OF_ROWS = 100;
 const GPX_DIR = path.join(__dirname, '..', 'gpx_files', 'durunubi');
+
+// --- DynamoDB Client Setup ---
+const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'ap-northeast-2' });
+const docClient = DynamoDBDocumentClient.from(client, {
+  marshallOptions: {
+    removeUndefinedValues: true,
+  },
+});
+const TABLE_NAME = process.env.COURSE_TABLE_NAME || 'COURSE_DATA_TEST_TABLE';
 
 /**
  * GPX 파일에서 첫 좌표를 읽어옵니다.
@@ -114,7 +123,11 @@ Fetching API data for page: ${pageNo}...`);
 `,
           JSON.stringify(courseData, null, 2),
         );
-        await Course.upsert(courseData);
+        
+        await docClient.send(new PutCommand({
+          TableName: TABLE_NAME,
+          Item: courseData
+        }));
       });
 
       await Promise.all(upsertPromises);
@@ -135,8 +148,6 @@ Fetching API data for page: ${pageNo}...`);
 --------------------------------------------------`);
     console.log(`Seeding complete. Total records processed: ${totalUpserted}`);
     console.log(`--------------------------------------------------`);
-    await sequelize.close();
-    console.log('Database connection closed.');
   }
 };
 
