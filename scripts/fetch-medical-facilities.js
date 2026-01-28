@@ -1,8 +1,9 @@
 /**
- * @fileoverview Medical Facility Data Fetcher
+ * @fileoverview Medical Facility Data Fetcher (Gzip version)
  *
  * 공공데이터포털(Data.go.kr)의 "국립중앙의료원_전국 병·의원 찾기 서비스" API를 사용하여
- * 전국의 의료기관 정보를 수집하고, 응급실 운영 여부 등을 포함하여 로컬 JSON 파일로 저장하는 스크립트이다.
+ * 전국의 의료기관 정보를 수집하고, Hive 스타일 파티션 구조(source/dt/page)에 맞춰 
+ * Gzip 압축 JSON(.json.gz)으로 저장하는 스크립트이다.
  *
  * --------------------------------------------------------------------------------
  * [Target API Information]
@@ -16,7 +17,8 @@
  * 2. Filtering: `dutyEmclsName`이 '응급의료기관 이외'인 단순 의원급은 제외하고,
  *    응급실 운영 가능성이 있거나 규모가 있는 병원급 이상을 선별하여 저장.
  * 3. Transformation: API의 한글/약어 필드명을 영어 Key로 변환.
- * 4. Storage: `data/medical-facilities/` 폴더에 페이지별 JSON 파일로 저장.
+ * 4. Storage: `data/raw/hospitals/source=data_go_kr/dt={YYYY-MM-DD}/` 폴더에
+ *    `page={XXXX}.json.gz` 형식으로 압축 저장.
  * --------------------------------------------------------------------------------
  *
  * [Required Environment Variables]
@@ -33,6 +35,7 @@
  * @requires xml2js
  * @requires pino
  * @requires fs/promises
+ * @requires zlib
  */
 
 /**
@@ -77,13 +80,18 @@ const { parseStringPromise } = require('xml2js');
 const pino = require('pino');
 const fs = require('fs/promises');
 const path = require('path');
+const zlib = require('zlib');
+const { promisify } = require('util');
+
+// Gzip 압축을 비동기(Promise) 방식으로 사용하기 위해 promisify 적용
+const gzipAsync = promisify(zlib.gzip);
 
 // ============================================================================
 // Logger Configuration
 // ============================================================================
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'debug',
+  level: process.env.LOG_LEVEL || 'info',
   timestamp: pino.stdTimeFunctions.isoTime,
   formatters: {
     level: (label) => ({ level: label.toUpperCase() }),
@@ -100,14 +108,15 @@ const logger = pino({
 
 const SERVICE_KEY = process.env.MEDICAL_FACILITIES_API_KEY;
 const API_ENDPOINT = 'http://apis.data.go.kr/B552657/HsptlAsembySearchService/getHsptlMdcncFullDown';
-const OUTPUT_DIR = path.join(__dirname, '..', 'data', 'medical-facilities');
 
 const PARSER_OPTIONS = {
-  explicitArray: false, // <item> sub-elements are not wrapped in an array
-  trim: true,
+  explicitArray: false, // 단일 요소가 배열로 감싸지는 것을 방지
+  trim: true,           // 텍스트 앞뒤 공백 제거
 };
 
-// Maps API response fields to our database columns
+/**
+ * API 응답 필드와 데이터베이스/JSON 스키마 필드 간의 매핑 정의
+ */
 const FIELD_MAPPING = {
   hpid: 'hpid',
   dutyName: 'name',
@@ -148,61 +157,61 @@ const FIELD_MAPPING = {
 // ============================================================================
 
 /**
- * Fetches a single page of data from the API.
- * @param {number} pageNo - The page number to fetch.
- * @returns {Promise<MedicalFacilityItem[]>} A promise that resolves to an array of items.
+ * 특정 페이지의 의료기관 데이터를 API로부터 가져옵니다.
+ * 
+ * @param {number} pageNo 조회할 페이지 번호
+ * @returns {Promise<Object[]>} 의료기관 목록 배열
  */
-async function fetchPage(pageNo) {
+async function fetchMedicalFacilitiesFromApi(pageNo) {
   try {
     const response = await axios.get(API_ENDPOINT, {
-      headers: {
-        Accept: 'application/xml',
-      },
+      headers: { Accept: 'application/xml' },
       params: {
         serviceKey: SERVICE_KEY,
         pageNo,
-        numOfRows: 1000, // Per API documentation, utilizing a large batch size
+        numOfRows: 1000,
       },
     });
 
-    const xml = response.data;
-    const result = await parseStringPromise(xml, PARSER_OPTIONS);
+    const result = await parseStringPromise(response.data, PARSER_OPTIONS);
 
-    // Defensive check for response structure
-    if (!result?.response?.header) {
-      throw new Error('Invalid API response structure');
-    }
-
-    if (result.response.header.resultCode !== '00') {
-      throw new Error(`API Error: ${result.response.header.resultMsg}`);
+    if (result?.response?.header?.resultCode !== '00') {
+      throw new Error(`API Error: ${result?.response?.header?.resultMsg}`);
     }
 
     const items = result.response.body?.items?.item;
-    
-    // Normalize to array
     if (!items) return [];
+    
+    // 데이터가 1개일 경우 객체로 반환되므로 배열로 정규화
     return Array.isArray(items) ? items : [items];
-
   } catch (error) {
-    logger.error({ err: error, pageNo }, `Error fetching page ${pageNo}`);
+    logger.error({ err: error, pageNo }, `Failed to fetch page ${pageNo} from API`);
     return [];
   }
 }
 
 /**
- * Transforms a single API item into the format for our database model.
- * @param {MedicalFacilityItem} item - The item from the API response.
- * @returns {object} The transformed object for DB insertion.
+ * API 응답 데이터를 내부 서비스 규격에 맞게 변환합니다.
+ * 
+ * @param {Object} rawItem API로부터 받은 원본 데이터 객체
+ * @returns {Object} 변환된 데이터 객체
  */
-function transformItem(item) {
-  const transformed = {};
-  for (const apiKey in FIELD_MAPPING) {
-    const modelKey = FIELD_MAPPING[apiKey];
-    if (item[apiKey] !== undefined && item[apiKey] !== null) {
-      transformed[modelKey] = item[apiKey];
+function normalizeFacilityData(rawItem) {
+  const normalized = {};
+  for (const [apiKey, serviceKey] of Object.entries(FIELD_MAPPING)) {
+    if (rawItem[apiKey] !== undefined && rawItem[apiKey] !== null) {
+      normalized[serviceKey] = rawItem[apiKey];
     }
   }
-  return transformed;
+  return normalized;
+}
+
+/**
+ * 현재 날짜를 YYYY-MM-DD 형식의 문자열로 반환합니다.
+ */
+function getCurrentDatePath() {
+  const now = new Date();
+  return now.toISOString().split('T')[0];
 }
 
 // ============================================================================
@@ -210,67 +219,73 @@ function transformItem(item) {
 // ============================================================================
 
 /**
- * Main function to fetch all data and store it in the database.
+ * 전체 의료기관 데이터를 순회하며 수집 및 저장하는 메인 함수입니다.
  */
-async function run() {
-  // 1. Environment Validation
+async function startMedicalDataIngestion() {
   if (!SERVICE_KEY) {
-    logger.fatal('MEDICAL_FACILITIES_API_KEY environment variable is not set.');
+    logger.fatal('Required environment variable MEDICAL_FACILITIES_API_KEY is missing.');
     process.exit(1);
   }
 
-  logger.info({ apiEndpoint: API_ENDPOINT, outputDir: OUTPUT_DIR }, 'Starting to fetch medical facility data...');
+  const datePartition = getCurrentDatePath();
+  const baseOutputDir = path.join(
+    process.cwd(),
+    'data', 'raw', 'hospitals',
+    'source=data_go_kr',
+    `dt=${datePartition}`
+  );
+
+  logger.info({ apiEndpoint: API_ENDPOINT, baseOutputDir }, 'Starting medical facility data ingestion');
 
   try {
-    // Ensure output directory exists
-    await fs.mkdir(OUTPUT_DIR, { recursive: true });
+    // 저장 폴더 생성 (하위 폴더 포함)
+    await fs.mkdir(baseOutputDir, { recursive: true });
     
-    let pageNo = 1;
-    let totalSaved = 0;
+    let currentPage = 1;
+    let totalItemsProcessed = 0;
 
-    // 2. Fetch Loop
-    while (true) {
-      logger.info({ pageNo }, 'Fetching page...');
-      const items = await fetchPage(pageNo);
+    while (currentPage < 1000) { // 무한 루프 방지를 위한 안전 장치
+      logger.info({ currentPage }, 'Fetching facilities from API...');
+      const rawFacilities = await fetchMedicalFacilitiesFromApi(currentPage);
 
-      if (items.length === 0) {
-        logger.info('No more items found (empty list). Finishing process.');
+      if (rawFacilities.length === 0) {
+        logger.info('No more data found. Ingestion complete.');
         break;
       }
 
-      // 3. Filtering
-      const filteredItems = items.filter(
-        (item) => item.dutyEmclsName !== '응급의료기관 이외'
-      );
+      // 1. 유효한 의료기관(응급실 운영 등) 필터링 및 데이터 정규화
+      const processedFacilities = rawFacilities
+        .filter(item => item.dutyEmclsName !== '응급의료기관 이외')
+        .map(normalizeFacilityData);
 
-      // 4. Storage (JSON File)
-      if (filteredItems.length > 0) {
-        const recordsToSave = filteredItems.map(transformItem);
+      // 2. 파일 저장 처리
+      if (processedFacilities.length > 0) {
+        const jsonContent = JSON.stringify(processedFacilities, null, 2);
+        const compressedBuffer = await gzipAsync(jsonContent);
+
+        const fileName = `page=${String(currentPage).padStart(4, '0')}.json.gz`;
+        const savePath = path.join(baseOutputDir, fileName);
         
-        const filePath = path.join(OUTPUT_DIR, `medical-facilities-page-${pageNo}.json`);
-        await fs.writeFile(filePath, JSON.stringify(recordsToSave, null, 2), 'utf8');
-
-        totalSaved += recordsToSave.length;
-        logger.info(
-          { count: recordsToSave.length, pageNo, filePath },
-          'Saved records to JSON file'
-        );
+        await fs.writeFile(savePath, compressedBuffer);
+        totalItemsProcessed += processedFacilities.length;
+        
+        logger.info({ currentPage, count: processedFacilities.length, file: fileName }, 'Successfully saved compressed page');
       } else {
-        logger.info({ pageNo }, 'No relevant items to save on this page.');
+        logger.info({ currentPage }, 'No relevant facilities to save on this page.');
       }
 
-      pageNo++;
+      currentPage++;
       
-      // Basic rate limiting to be safe (optional but good practice)
+      // API 서버 부하 방지를 위한 짧은 대기 (100ms)
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    logger.info({ totalSaved }, 'Finished fetching and saving data.');
-
+    logger.info({ totalItemsProcessed }, 'Medical facility data ingestion finished successfully');
   } catch (error) {
-    logger.fatal({ err: error }, 'A critical error occurred during execution');
+    logger.fatal({ err: error }, 'Critical error occurred during data ingestion');
     process.exit(1);
   }
 }
 
-run();
+// 스크립트 실행
+startMedicalDataIngestion();
