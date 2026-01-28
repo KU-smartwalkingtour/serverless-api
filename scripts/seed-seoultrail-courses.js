@@ -32,7 +32,7 @@
  * - `LOG_LEVEL`: (Optional) 로그 레벨 (default: info)
  * --------------------------------------------------------------------------------
  *
- * @see {@link http://data.seoul.go.kr/dataList/OA-15494/S/1/datasetView.do | 서울 열린데이터 광장 - 서울둘레길 정보}
+ * @see {@link https://data.seoul.go.kr/dataList/OA-22438/S/1/datasetView.do | 서울 열린데이터 광장 - 서울둘레길 코스정보}
  *
  * @requires dotenv
  * @requires axios
@@ -185,6 +185,7 @@ const seedDatabase = async () => {
   try {
     logger.info('Fetching API data...');
     const response = await axios.get(API_URL);
+    logger.info(response);
 
     const rows = response.data?.viewGil?.row;
     if (!rows || rows.length === 0) {
@@ -213,7 +214,7 @@ const seedDatabase = async () => {
         start_lon: firstPoint?.lon || null,
       };
 
-      logger.debug({ courseId: courseData.course_id }, 'Upserting course data');
+      logger.debug({ courseId: courseId, courseData: courseData }, 'Upserting course data');
 
       await docClient.send(new PutCommand({
         TableName: TABLE_NAME,
