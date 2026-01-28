@@ -2,7 +2,7 @@
  * @fileoverview Seoul Trail Course Data Seeder
  *
  * 서울 열린데이터 광장이 제공하는 "서울둘레길 코스 정보" API를 사용하여
- * 서울둘레길의 코스 목록을 조회하고, 로컬 GPX 파일과 결합하여 DynamoDB에 저장하는 스크립트이다.
+ * 서울둘레길의 코스 목록을 조회하고, 로컬 GPX 파일과 결합하여 로컬 JSON 파일로 저장하는 스크립트이다.
  *
  * --------------------------------------------------------------------------------
  * [Target API Information]
@@ -22,13 +22,12 @@
  *    - `GIL_EXPLN` -> `course_description`: 설명 (개행 문자 제거)
  *    - `STRT_PSTN` -> `location`: 시작 지점 주소
  * 3. GPX Integration: `gpx_files/seoultrail/seoultrail_{GIL_NO}.gpx` 파일 파싱하여 시작점 좌표 추출.
- * 4. Storage: DynamoDB `COURSE_DATA_TABLE`에 저장.
+ * 4. Storage: `data/raw/trails/source=seoultrail/dt={YYYY-MM-DD}/meta/` 폴더에
+ *    `page=0001.json.gz` 형식으로 압축 저장.
  * --------------------------------------------------------------------------------
  *
  * [Required Environment Variables]
  * - `SEOUL_TRAIL_API_KEY`: 서울 열린데이터 광장 인증키
- * - `AWS_REGION`: (Optional) AWS 리전 (default: ap-northeast-2)
- * - `COURSE_TABLE_NAME`: (Optional) DynamoDB 테이블명
  * - `LOG_LEVEL`: (Optional) 로그 레벨 (default: info)
  * --------------------------------------------------------------------------------
  *
@@ -38,9 +37,8 @@
  * @requires axios
  * @requires fs/promises
  * @requires gpx-parse
- * @requires @aws-sdk/client-dynamodb
- * @requires @aws-sdk/lib-dynamodb
  * @requires pino
+ * @requires zlib
  */
 
 /**
@@ -60,13 +58,15 @@ const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
 const gpxParse = require('gpx-parse');
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
 const pino = require('pino');
+const zlib = require('zlib');
+const { promisify } = require('util');
 
-// ============================================================================
+const gzip = promisify(zlib.gzip);
+
+// ============================================================================ 
 // Logger Configuration
-// ============================================================================
+// ============================================================================ 
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'debug',
@@ -80,32 +80,29 @@ const logger = pino({
   },
 });
 
-// ============================================================================
+// ============================================================================ 
 // Constants & Configuration
-// ============================================================================
+// ============================================================================ 
 
 const SERVICE_KEY = process.env.SEOUL_TRAIL_API_KEY;
 // 서울 열린데이터 광장은 path variable로 인증키를 전달 (1부터 22까지 전체 조회)
 // Note: If the API service name has changed from 'viewGil' to something else (e.g. 'seoulGilWalkCourse'), update this URL.
 const API_URL = `http://openapi.seoul.go.kr:8088/${SERVICE_KEY}/json/viewGil/1/22`;
-const GPX_DIR = path.join(__dirname, '..', 'gpx_files', 'seoultrail');
-const TABLE_NAME = process.env.COURSE_TABLE_NAME || 'COURSE_DATA_TEST_TABLE';
-const REGION = process.env.AWS_REGION || 'ap-northeast-2';
 
-// ============================================================================
-// DynamoDB Client Setup
-// ============================================================================
-
-const client = new DynamoDBClient({ region: REGION });
-const docClient = DynamoDBDocumentClient.from(client, {
-  marshallOptions: {
-    removeUndefinedValues: true,
-  },
-});
-
-// ============================================================================
+// ============================================================================ 
 // Helper Functions
-// ============================================================================
+// ============================================================================ 
+
+/**
+ * 현재 날짜를 YYYY-MM-DD 형식의 문자열로 반환합니다.
+ */
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 /**
  * GPX 파일에서 첫 번째 좌표(시작점)를 추출합니다.
@@ -175,15 +172,26 @@ const parseDuration = (timeString) => {
   return totalMinutes > 0 ? totalMinutes : null;
 };
 
-// ============================================================================
+// ============================================================================ 
 // Main Execution Logic
-// ============================================================================
+// ============================================================================ 
 
 const seedDatabase = async () => {
-  logger.info({ tableName: TABLE_NAME, apiUrl: API_URL }, 'Starting Seoul Trail course database seeding');
-  let totalUpserted = 0;
+  const dateStr = getTodayDateString();
+  const baseDir = path.join(process.cwd(), 'data', 'raw', 'trails', 'source=seoultrail', `dt=${dateStr}`);
+  // GPX files are expected to be in the 'gpx' subdir from the fetch step
+  const gpxDir = path.join(baseDir, 'gpx');
+  // Metadata will be saved in the 'meta' subdir
+  const metaDir = path.join(baseDir, 'meta');
+
+  logger.info({ metaDir, gpxDir, apiUrl: API_URL }, 'Starting Seoul Trail course meta data collection');
+  
+  let totalSaved = 0;
 
   try {
+    // 메타데이터 저장 디렉토리 생성
+    await fs.mkdir(metaDir, { recursive: true });
+
     logger.info('Fetching API data...');
     const response = await axios.get(API_URL);
 
@@ -194,16 +202,19 @@ const seedDatabase = async () => {
       return;
     }
 
-    logger.info({ count: rows.length }, 'Processing items for database insertion');
+    logger.info({ count: rows.length }, 'Processing items...');
 
-    const upsertPromises = rows.map(async (/** @type {SeoulTrailItem} */ item) => {
+    const processedItems = await Promise.all(rows.map(async (/** @type {SeoulTrailItem} */ item) => {
       // 서울둘레길 ID 규칙: seoultrail_{ROAD_NO}
       const courseId = `seoultrail_${item.ROAD_NO}`;
-      // GPX 파일명 규칙: 서울둘레길2.0_{ROAD_NO}코스.gpx
-      const gpxFilePath = path.join(GPX_DIR, `서울둘레길2.0_${item.ROAD_NO}코스.gpx`);
+      // GPX 파일명 규칙: 서울둘레길2.0_{ROAD_NO}코스.gpx (fetch-seoultrail-gpx.js 결과물 참조)
+      // Note: fetch-seoultrail-gpx.js extracts files as they are named in the ZIP.
+      // Assuming filenames match what we expect here. If fetch-seoultrail-gpx.js simply extracts without renaming,
+      // we must rely on the consistent naming in the source ZIP.
+      const gpxFilePath = path.join(gpxDir, `서울둘레길2.0_${item.ROAD_NO}코스.gpx`);
       const firstPoint = await getFirstPointFromGpx(gpxFilePath);
 
-      const courseData = {
+      return {
         course_id: courseId,
         course_name: `${item.ROAD_NM} 서울둘레길`,
         course_type: 'seoultrail',
@@ -215,17 +226,21 @@ const seedDatabase = async () => {
         start_lat: firstPoint?.lat || null,
         start_lon: firstPoint?.lon || null,
       };
+    }));
 
-      logger.debug({ courseId: courseId, courseData: courseData }, 'Upserting course data');
+    // 파일 저장 (JSON.gz)
+    if (processedItems.length > 0) {
+      const jsonContent = JSON.stringify(processedItems, null, 2);
+      const compressed = await gzip(jsonContent);
 
-      await docClient.send(new PutCommand({
-        TableName: TABLE_NAME,
-        Item: courseData
-      }));
-    });
+      const fileName = 'page=0001.json.gz';
+      const savePath = path.join(metaDir, fileName);
 
-    await Promise.all(upsertPromises);
-    totalUpserted = rows.length;
+      await fs.writeFile(savePath, compressed);
+      totalSaved = processedItems.length;
+
+      logger.info({ count: processedItems.length, file: fileName }, 'Saved compressed metadata');
+    }
 
   } catch (error) {
     // Axios error handling
@@ -235,7 +250,7 @@ const seedDatabase = async () => {
       logger.fatal({ err: error }, 'A critical error occurred during the seeding process');
     }
   } finally {
-    logger.info({ totalRecords: totalUpserted }, 'Seeding complete');
+    logger.info({ totalRecords: totalSaved }, 'Seeding complete');
   }
 };
 

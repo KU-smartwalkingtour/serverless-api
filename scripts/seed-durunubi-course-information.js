@@ -3,7 +3,7 @@
  *
  * 한국관광공사가 제공하는 "두루누비 정보 서비스_GW" API를 사용하여
  * 전국 순환형 트래킹 코스 '코리아둘레길'의 코스 목록을 조회하고,
- * 로컬에 저장된 GPX 파일에서 시작점 좌표를 추출하여 DynamoDB에 코스 정보를 저장(Upsert)하는 스크립트이다.
+ * 로컬에 저장된 GPX 파일에서 시작점 좌표를 추출하여 로컬 JSON 파일로 저장하는 스크립트이다.
  *
  * --------------------------------------------------------------------------------
  * [Target API Information]
@@ -23,14 +23,14 @@
  *    - `crsContents` -> `course_description`: 코스 설명
  *    - `sigun` -> `location`: 소재지 (시군구)
  * 3. GPX Integration: 로컬 GPX 파일에서 추출한 `start_lat`, `start_lon` 좌표를 결합.
- * 4. Storage: DynamoDB `COURSE_DATA_TABLE`에 최종 객체를 Upsert.
+ * 4. Storage: `data/raw/trails/source=durunubi/dt={YYYY-MM-DD}/meta/` 폴더에
+ *    `page={XXXX}.json.gz` 형식으로 압축 저장.
  * --------------------------------------------------------------------------------
  *
  * [Required Environment Variables]
  * - `DURUNUBI_SERVICE_KEY`: 두루누비 API 인증 키
- * - `AWS_REGION`: (Optional) AWS 리전 (default: ap-northeast-2)
- * - `COURSE_TABLE_NAME`: (Optional) DynamoDB 테이블명 (default: COURSE_DATA_TEST_TABLE)
  * - `LOG_LEVEL`: (Optional) 로그 레벨 (default: info)
+ * - `NODE_ENV`: (Optional) 실행 환경 (development/production)
  * --------------------------------------------------------------------------------
  *
  * @see {@link https://www.data.go.kr/data/15101974/openapi.do#/API%20%EB%AA%A9%EB%A1%9D/courseList | 한국관광공사_두루누비 정보 서비스_GW API 문서}
@@ -39,9 +39,8 @@
  * @requires axios
  * @requires fs/promises
  * @requires gpx-parse
- * @requires @aws-sdk/client-dynamodb
- * @requires @aws-sdk/lib-dynamodb
  * @requires pino
+ * @requires zlib
  */
 
 /**
@@ -62,9 +61,11 @@ const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
 const gpxParse = require('gpx-parse');
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
 const pino = require('pino');
+const zlib = require('zlib');
+const { promisify } = require('util');
+
+const gzip = promisify(zlib.gzip);
 
 // ============================================================================
 // Logger Configuration
@@ -92,24 +93,21 @@ const logger = pino({
 const SERVICE_KEY = process.env.DURUNUBI_SERVICE_KEY;
 const API_BASE_URL = 'https://apis.data.go.kr/B551011/Durunubi/courseList';
 const NUM_OF_ROWS = 100;
-const GPX_DIR = path.join(__dirname, '..', 'gpx_files', 'durunubi');
-const TABLE_NAME = process.env.COURSE_TABLE_NAME || 'COURSE_DATA_TEST_TABLE';
-const REGION = process.env.AWS_REGION || 'ap-northeast-2';
-
-// ============================================================================
-// DynamoDB Client Setup
-// ============================================================================
-
-const client = new DynamoDBClient({ region: REGION });
-const docClient = DynamoDBDocumentClient.from(client, {
-  marshallOptions: {
-    removeUndefinedValues: true,
-  },
-});
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * 현재 날짜를 YYYY-MM-DD 형식의 문자열로 반환합니다.
+ */
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 /**
  * GPX 파일에서 첫 번째 트랙의 첫 번째 세그먼트의 첫 번째 좌표(시작점)를 추출합니다.
@@ -170,15 +168,31 @@ const mapDifficulty = (level) => {
 
 /**
  * 메인 시딩 함수.
- * API 페이지를 순회하며 데이터를 가공하여 DynamoDB에 저장합니다.
+ * API 페이지를 순회하며 데이터를 가공하여 로컬 파일 시스템에 저장합니다.
  */
 const seedDatabase = async () => {
-  logger.info({ tableName: TABLE_NAME }, 'Starting Durunubi course database seeding');
-  
-  let pageNo = 1;
-  let totalUpserted = 0;
+  if (!SERVICE_KEY) {
+    logger.fatal('DURUNUBI_SERVICE_KEY environment variable is not set.');
+    process.exit(1);
+  }
 
+  // Define dynamic paths
+  const dateStr = getTodayDateString();
+  const baseDir = path.join(process.cwd(), 'data', 'raw', 'trails', 'source=durunubi', `dt=${dateStr}`);
+  // GPX files are expected to be in the 'gpx' subdir from the fetch step
+  const gpxDir = path.join(baseDir, 'gpx');
+  // Metadata will be saved in the 'meta' subdir
+  const metaDir = path.join(baseDir, 'meta');
+
+  logger.info({ metaDir, gpxDir }, 'Starting Durunubi course meta data collection');
+  
   try {
+    // 메타데이터 저장 디렉토리 생성
+    await fs.mkdir(metaDir, { recursive: true });
+
+    let pageNo = 1;
+    let totalProcessed = 0;
+
     while (true) {
       logger.info({ pageNo }, 'Fetching API data');
 
@@ -200,14 +214,15 @@ const seedDatabase = async () => {
       }
 
       const items = Array.isArray(body.items.item) ? body.items.item : [body.items.item];
-      logger.info({ count: items.length, pageNo }, 'Processing items for database insertion');
+      logger.info({ count: items.length, pageNo }, 'Processing items...');
 
-      const upsertPromises = items.map(async (/** @type {CourseItem} */ item) => {
-        const gpxFilePath = path.join(GPX_DIR, `${item.crsIdx}.gpx`);
+      const processedItems = await Promise.all(items.map(async (/** @type {CourseItem} */ item) => {
+        // GPX 파일 위치: fetch-durunubi-gpx.js가 저장한 경로 (같은 날짜 기준)
+        const gpxFilePath = path.join(gpxDir, `${item.crsIdx}.gpx`);
         const firstPoint = await getFirstPointFromGpx(gpxFilePath);
 
         // 새로운 스키마에 맞게 데이터 객체 구성
-        const courseData = {
+        return {
           course_id: item.crsIdx,
           course_name: item.crsKorNm,
           course_type: 'durunubi', // 타입 고정
@@ -219,18 +234,21 @@ const seedDatabase = async () => {
           start_lat: firstPoint?.lat || null,
           start_lon: firstPoint?.lon || null,
         };
+      }));
 
-        // 상세 로그는 debug 레벨로 낮춰서 노이즈 감소
-        logger.debug({ courseId: courseData.course_id }, 'Upserting course data');
-        
-        await docClient.send(new PutCommand({
-          TableName: TABLE_NAME,
-          Item: courseData
-        }));
-      });
+      // 파일 저장 (JSON.gz)
+      if (processedItems.length > 0) {
+        const jsonContent = JSON.stringify(processedItems, null, 2);
+        const compressed = await gzip(jsonContent);
 
-      await Promise.all(upsertPromises);
-      totalUpserted += items.length;
+        const fileName = `page=${String(pageNo).padStart(4, '0')}.json.gz`;
+        const savePath = path.join(metaDir, fileName);
+
+        await fs.writeFile(savePath, compressed);
+        totalProcessed += processedItems.length;
+
+        logger.info({ pageNo, count: processedItems.length, file: fileName }, 'Saved compressed metadata');
+      }
 
       if (body.numOfRows < NUM_OF_ROWS) {
         logger.info('Reached the last page from API.');
@@ -240,10 +258,12 @@ const seedDatabase = async () => {
       pageNo++;
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
+
+    logger.info({ totalProcessed }, 'Durunubi metadata collection complete');
+
   } catch (error) {
     logger.fatal({ err: error }, 'A critical error occurred during the seeding process');
-  } finally {
-    logger.info({ totalRecords: totalUpserted }, 'Seeding complete');
+    process.exit(1);
   }
 };
 
