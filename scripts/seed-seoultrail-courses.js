@@ -2,7 +2,7 @@
  * @fileoverview Seoul Trail Course Data Seeder
  *
  * 서울 열린데이터 광장이 제공하는 "서울둘레길 코스 정보" API를 사용하여
- * 서울둘레길의 코스 목록을 조회하고, 로컬 GPX 파일과 결합하여 로컬 JSON 파일로 저장하는 스크립트이다.
+ * 서울둘레길의 코스 목록을 조회하고, 로컬 JSON 파일로 저장하는 스크립트이다.
  *
  * --------------------------------------------------------------------------------
  * [Target API Information]
@@ -21,8 +21,7 @@
  *    - `LV_CD` -> `course_difficulty`: 난이도 매핑 (초급->하, 중급->중, 상급->상)
  *    - `GIL_EXPLN` -> `course_description`: 설명 (개행 문자 제거)
  *    - `STRT_PSTN` -> `location`: 시작 지점 주소
- * 3. GPX Integration: `gpx_files/seoultrail/seoultrail_{GIL_NO}.gpx` 파일 파싱하여 시작점 좌표 추출.
- * 4. Storage: `data/raw/trails/source=seoultrail/dt={YYYY-MM-DD}/meta/` 폴더에
+ * 3. Storage: `data/raw/trails/source=seoultrail/dt={YYYY-MM-DD}/meta/` 폴더에
  *    `page=0001.json.gz` 형식으로 압축 저장.
  * --------------------------------------------------------------------------------
  *
@@ -36,7 +35,6 @@
  * @requires dotenv
  * @requires axios
  * @requires fs/promises
- * @requires gpx-parse
  * @requires pino
  * @requires zlib
  */
@@ -57,7 +55,6 @@ require('dotenv').config();
 const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
-const gpxParse = require('gpx-parse');
 const pino = require('pino');
 const zlib = require('zlib');
 const { promisify } = require('util');
@@ -105,38 +102,6 @@ function getTodayDateString() {
 }
 
 /**
- * GPX 파일에서 첫 번째 좌표(시작점)를 추출합니다.
- *
- * @param {string} gpxFilePath - GPX 파일 경로
- * @returns {Promise<{lat: number, lon: number}|null>}
- */
-const getFirstPointFromGpx = async (gpxFilePath) => {
-  try {
-    let gpxData = await fs.readFile(gpxFilePath, 'utf8');
-    // GPX-parse 호환성 보정
-    if (!gpxData.match(/<gpx[^>]+version=/i)) {
-      gpxData = gpxData.replace(/<gpx/i, '<gpx version="1.1"');
-    }
-    const parsed = await new Promise((resolve, reject) => {
-      gpxParse.parseGpx(gpxData, (error, data) => {
-        if (error) return reject(error);
-        resolve(data);
-      });
-    });
-    const firstPoint = parsed?.tracks[0]?.segments[0]?.[0];
-    if (firstPoint && firstPoint.lat && firstPoint.lon) {
-      return { lat: firstPoint.lat, lon: firstPoint.lon };
-    }
-    return null;
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      logger.warn({ err: error, file: path.basename(gpxFilePath) }, 'Error parsing GPX file');
-    }
-    return null;
-  }
-};
-
-/**
  * API의 문자 난이도를 '하', '중', '상'으로 변환합니다.
  * @param {string} level - "초급", "중급", "상급"
  */
@@ -179,12 +144,10 @@ const parseDuration = (timeString) => {
 const seedDatabase = async () => {
   const dateStr = getTodayDateString();
   const baseDir = path.join(process.cwd(), 'data', 'raw', 'trails', 'source=seoultrail', `dt=${dateStr}`);
-  // GPX files are expected to be in the 'gpx' subdir from the fetch step
-  const gpxDir = path.join(baseDir, 'gpx');
   // Metadata will be saved in the 'meta' subdir
   const metaDir = path.join(baseDir, 'meta');
 
-  logger.info({ metaDir, gpxDir, apiUrl: API_URL }, 'Starting Seoul Trail course meta data collection');
+  logger.info({ metaDir, apiUrl: API_URL }, 'Starting Seoul Trail course meta data collection');
   
   let totalSaved = 0;
 
@@ -204,15 +167,9 @@ const seedDatabase = async () => {
 
     logger.info({ count: rows.length }, 'Processing items...');
 
-    const processedItems = await Promise.all(rows.map(async (/** @type {SeoulTrailItem} */ item) => {
+    const processedItems = rows.map((/** @type {SeoulTrailItem} */ item) => {
       // 서울둘레길 ID 규칙: seoultrail_{ROAD_NO}
       const courseId = `seoultrail_${item.ROAD_NO}`;
-      // GPX 파일명 규칙: 서울둘레길2.0_{ROAD_NO}코스.gpx (fetch-seoultrail-gpx.js 결과물 참조)
-      // Note: fetch-seoultrail-gpx.js extracts files as they are named in the ZIP.
-      // Assuming filenames match what we expect here. If fetch-seoultrail-gpx.js simply extracts without renaming,
-      // we must rely on the consistent naming in the source ZIP.
-      const gpxFilePath = path.join(gpxDir, `서울둘레길2.0_${item.ROAD_NO}코스.gpx`);
-      const firstPoint = await getFirstPointFromGpx(gpxFilePath);
 
       return {
         course_id: courseId,
@@ -223,10 +180,8 @@ const seedDatabase = async () => {
         course_difficulty: mapDifficulty(item.LV_KORN),
         course_description: item.ROAD_EXPLN ? item.ROAD_EXPLN.replace(/\r\n/g, ' ') : null,
         location: item.BGNG_PSTN,
-        start_lat: firstPoint?.lat || null,
-        start_lon: firstPoint?.lon || null,
       };
-    }));
+    });
 
     // 파일 저장 (JSON.gz)
     if (processedItems.length > 0) {

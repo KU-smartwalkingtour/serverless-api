@@ -3,7 +3,7 @@
  *
  * 한국관광공사가 제공하는 "두루누비 정보 서비스_GW" API를 사용하여
  * 전국 순환형 트래킹 코스 '코리아둘레길'의 코스 목록을 조회하고,
- * 로컬에 저장된 GPX 파일에서 시작점 좌표를 추출하여 로컬 JSON 파일로 저장하는 스크립트이다.
+ * 코스 메타데이터를 로컬 JSON 파일로 저장하는 스크립트이다.
  *
  * --------------------------------------------------------------------------------
  * [Target API Information]
@@ -22,8 +22,7 @@
  *    - `crsLevel` -> `course_difficulty`: 난이도 (1:하, 2:중, 3:상)
  *    - `crsContents` -> `course_description`: 코스 설명
  *    - `sigun` -> `location`: 소재지 (시군구)
- * 3. GPX Integration: 로컬 GPX 파일에서 추출한 `start_lat`, `start_lon` 좌표를 결합.
- * 4. Storage: `data/raw/trails/source=durunubi/dt={YYYY-MM-DD}/meta/` 폴더에
+ * 3. Storage: `data/raw/trails/source=durunubi/dt={YYYY-MM-DD}/meta/` 폴더에
  *    `page={XXXX}.json.gz` 형식으로 압축 저장.
  * --------------------------------------------------------------------------------
  *
@@ -38,7 +37,6 @@
  * @requires dotenv
  * @requires axios
  * @requires fs/promises
- * @requires gpx-parse
  * @requires pino
  * @requires zlib
  */
@@ -60,7 +58,6 @@ require('dotenv').config();
 const axios = require('axios');
 const fs = require('fs/promises');
 const path = require('path');
-const gpxParse = require('gpx-parse');
 const pino = require('pino');
 const zlib = require('zlib');
 const { promisify } = require('util');
@@ -110,40 +107,6 @@ function getTodayDateString() {
 }
 
 /**
- * GPX 파일에서 첫 번째 트랙의 첫 번째 세그먼트의 첫 번째 좌표(시작점)를 추출합니다.
- *
- * @param {string} gpxFilePath - GPX 파일의 절대 경로
- * @returns {Promise<{lat: number, lon: number}|null>} 시작점 좌표 객체 또는 null
- */
-const getFirstPointFromGpx = async (gpxFilePath) => {
-  try {
-    let gpxData = await fs.readFile(gpxFilePath, 'utf8');
-    // GPX 버전 호환성을 위한 패치
-    if (!gpxData.match(/<gpx[^>]+version=/i)) {
-      gpxData = gpxData.replace(/<gpx/i, '<gpx version="1.1"');
-    }
-    const parsed = await new Promise((resolve, reject) => {
-      gpxParse.parseGpx(gpxData, (error, data) => {
-        if (error) return reject(error);
-        resolve(data);
-      });
-    });
-    const firstPoint = parsed?.tracks[0]?.segments[0]?.[0];
-    if (firstPoint && firstPoint.lat && firstPoint.lon) {
-      return { lat: firstPoint.lat, lon: firstPoint.lon };
-    }
-    return null;
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      // 파일이 없는 경우는 흔하므로(아직 수집 안됨 등) 에러 로그보다는 경고/무시 처리
-      // 단, 파싱 에러는 로그를 남김
-      logger.warn({ err: error, file: path.basename(gpxFilePath) }, 'Error parsing GPX file');
-    }
-    return null;
-  }
-};
-
-/**
  * API의 숫자 난이도 코드를 사람이 읽을 수 있는 문자열로 변환합니다.
  *
  * @param {string} level - API에서 받은 난이도 값 ("1", "2", "3")
@@ -179,12 +142,10 @@ const seedDatabase = async () => {
   // Define dynamic paths
   const dateStr = getTodayDateString();
   const baseDir = path.join(process.cwd(), 'data', 'raw', 'trails', 'source=durunubi', `dt=${dateStr}`);
-  // GPX files are expected to be in the 'gpx' subdir from the fetch step
-  const gpxDir = path.join(baseDir, 'gpx');
   // Metadata will be saved in the 'meta' subdir
   const metaDir = path.join(baseDir, 'meta');
 
-  logger.info({ metaDir, gpxDir }, 'Starting Durunubi course meta data collection');
+  logger.info({ metaDir }, 'Starting Durunubi course meta data collection');
   
   try {
     // 메타데이터 저장 디렉토리 생성
@@ -216,11 +177,7 @@ const seedDatabase = async () => {
       const items = Array.isArray(body.items.item) ? body.items.item : [body.items.item];
       logger.info({ count: items.length, pageNo }, 'Processing items...');
 
-      const processedItems = await Promise.all(items.map(async (/** @type {CourseItem} */ item) => {
-        // GPX 파일 위치: fetch-durunubi-gpx.js가 저장한 경로 (같은 날짜 기준)
-        const gpxFilePath = path.join(gpxDir, `${item.crsIdx}.gpx`);
-        const firstPoint = await getFirstPointFromGpx(gpxFilePath);
-
+      const processedItems = items.map((/** @type {CourseItem} */ item) => {
         // 새로운 스키마에 맞게 데이터 객체 구성
         return {
           course_id: item.crsIdx,
@@ -231,10 +188,8 @@ const seedDatabase = async () => {
           course_difficulty: mapDifficulty(item.crsLevel),
           course_description: item.crsContents,
           location: item.sigun,
-          start_lat: firstPoint?.lat || null,
-          start_lon: firstPoint?.lon || null,
         };
-      }));
+      });
 
       // 파일 저장 (JSON.gz)
       if (processedItems.length > 0) {
@@ -248,7 +203,7 @@ const seedDatabase = async () => {
         totalProcessed += processedItems.length;
 
         logger.info({ pageNo, count: processedItems.length, file: fileName }, 'Saved compressed metadata');
-      }
+      } 
 
       if (body.numOfRows < NUM_OF_ROWS) {
         logger.info('Reached the last page from API.');
