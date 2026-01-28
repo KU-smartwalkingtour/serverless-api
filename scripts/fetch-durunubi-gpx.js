@@ -13,10 +13,9 @@
  *
  * [Data Processing Strategy]
  * 1. Pagination: 'numOfRows'와 'totalCount'를 기반으로 마지막 페이지까지 자동 순회.
- * 2. Extraction: 응답 데이터(JSON)에서 다음 필드들을 추출하여 활용.
- *    - `crsIdx`: 코스 고유 ID. 파일명 생성 및 식별에 사용.
- *    - `gpxpath`: 실제 GPX 데이터를 다운로드할 원격 URL.
- * 3. Storage: 추출한 URL에서 XML/GPX 데이터를 받아 로컬 `gpx_files/durunubi/` 폴더에 저장.
+ * 2. Extraction: 응답 데이터(JSON)에서 `gpxpath` 추출.
+ * 3. Storage: `data/raw/trails/source=durunubi/dt={YYYY-MM-DD}/gpx/` 폴더에
+ *    `<crsIdx>.gpx` 형식으로 저장.
  * --------------------------------------------------------------------------------
  *
  * [Required Environment Variables]
@@ -94,8 +93,6 @@ const API_BASE_URL = 'https://apis.data.go.kr/B551011/Durunubi/courseList';
  */
 const NUM_OF_ROWS = 100;
 
-const OUTPUT_DIR = path.join(__dirname, '..', 'gpx_files', 'durunubi');
-
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -122,6 +119,17 @@ const fetchAndSaveGpx = async (url, savePath) => {
   }
 };
 
+/**
+ * 현재 날짜를 YYYY-MM-DD 형식의 문자열로 반환합니다.
+ */
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // ============================================================================
 // Main Execution Logic
 // ============================================================================
@@ -129,19 +137,35 @@ const fetchAndSaveGpx = async (url, savePath) => {
 /**
  * Main Orchestrator.
  *
- * 1. Output 디렉토리 생성.
+ * 1. Output 디렉토리 생성 (dt=YYYY-MM-DD 파티션 적용).
  * 2. API Pagination을 수행하며 코스 목록 조회.
  * 3. 각 코스의 GPX URL을 추출하여 비동기 병렬 다운로드 실행.
  * 4. Rate Limiting을 준수하며 마지막 페이지까지 반복.
  */
 const fetchAllCourses = async () => {
-  logger.info({ outputDir: OUTPUT_DIR, apiBaseUrl: API_BASE_URL }, 'Starting Durunubi course data fetch');
-
   // Initialization: Fail fast if the environment is not ready (e.g., permission issues).
+  if (!SERVICE_KEY) {
+    logger.fatal('DURUNUBI_SERVICE_KEY environment variable is not set.');
+    process.exit(1);
+  }
+
+  const dateStr = getTodayDateString();
+  const outputDir = path.join(
+    process.cwd(),
+    'data',
+    'raw',
+    'trails',
+    'source=durunubi',
+    `dt=${dateStr}`,
+    'gpx'
+  );
+
+  logger.info({ outputDir, apiBaseUrl: API_BASE_URL }, 'Starting Durunubi course data fetch');
+
   try {
-    await fs.mkdir(OUTPUT_DIR, { recursive: true });
+    await fs.mkdir(outputDir, { recursive: true });
   } catch (error) {
-    logger.fatal({ err: error, outputDir: OUTPUT_DIR }, 'Could not create output directory');
+    logger.fatal({ err: error, outputDir: outputDir }, 'Could not create output directory');
     process.exit(1);
   }
 
@@ -201,7 +225,7 @@ const fetchAllCourses = async () => {
         // - crsIdx: Unique identifier for file naming
         if (item.gpxpath && item.crsIdx) {
           const fileName = `${item.crsIdx}.gpx`;
-          const savePath = path.join(OUTPUT_DIR, fileName);
+          const savePath = path.join(outputDir, fileName);
           return fetchAndSaveGpx(item.gpxpath, savePath);
         }
         

@@ -2,7 +2,7 @@
  * @fileoverview Seoul Trail GPX Data Fetcher
  *
  * 서울둘레길 공식 웹사이트에서 제공하는 전체 코스 GPX ZIP 파일을 다운로드하고,
- * 압축을 해제하여 로컬 디렉토리에 저장하는 스크립트이다.
+ * 압축을 해제하여 저장하는 스크립트이다.
  *
  * --------------------------------------------------------------------------------
  * [Target Data Information]
@@ -12,11 +12,12 @@
  * --------------------------------------------------------------------------------
  *
  * [Data Processing Strategy]
- * 1. Preparation: 저장할 디렉토리(`gpx_files/seoultrail`) 생성 및 초기화.
+ * 1. Preparation: 저장할 디렉토리 생성 (dt=YYYY-MM-DD 파티션).
  * 2. Download: 원격 ZIP 파일을 스트림으로 다운로드하여 임시 파일로 저장.
  * 3. Extraction: `yauzl` 라이브러리를 사용하여 ZIP 압축 해제.
  *    - `iconv-lite`를 사용하여 CP949(EUC-KR)로 인코딩된 한글 파일명을 UTF-8로 변환.
- * 4. Cleanup: 다운로드한 임시 ZIP 파일 삭제.
+ * 4. Storage: `data/raw/trails/source=seoultrail/dt={YYYY-MM-DD}/gpx/` 폴더에 저장.
+ * 5. Cleanup: 다운로드한 임시 ZIP 파일 삭제.
  * --------------------------------------------------------------------------------
  *
  * [Required Environment Variables]
@@ -59,7 +60,6 @@ const logger = pino({
 // ============================================================================
 
 const GPX_ZIP_URL = 'https://gil.seoul.go.kr/common/file/download.do?enc=f2QKqShZzs2jJPsw8o6KWrJf13uLHJ3yW0veGTDIaeE%3D';
-const OUTPUT_DIR = path.join(__dirname, '..', 'gpx_files', 'seoultrail');
 const TEMP_ZIP_FILE = 'seoultrail_all.zip';
 
 // ============================================================================
@@ -127,6 +127,17 @@ const extractZip = (zipFilePath, targetDir) => {
   });
 };
 
+/**
+ * 현재 날짜를 YYYY-MM-DD 형식의 문자열로 반환합니다.
+ */
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // ============================================================================
 // Main Execution Logic
 // ============================================================================
@@ -135,16 +146,27 @@ const extractZip = (zipFilePath, targetDir) => {
  * Downloads and extracts the Seoul Trail GPX archive.
  */
 const fetchAndExtractGpx = async () => {
-  logger.info({ outputDir: OUTPUT_DIR }, 'Starting Seoul Trail GPX data fetch');
+  const dateStr = getTodayDateString();
+  const outputDir = path.join(
+    process.cwd(),
+    'data',
+    'raw',
+    'trails',
+    'source=seoultrail',
+    `dt=${dateStr}`,
+    'gpx'
+  );
 
-  const zipPath = path.join(OUTPUT_DIR, TEMP_ZIP_FILE);
+  logger.info({ outputDir, url: GPX_ZIP_URL }, 'Starting Seoul Trail GPX data fetch');
+
+  const zipPath = path.join(outputDir, TEMP_ZIP_FILE);
 
   try {
     // 1. Prepare Directory
-    await fsPromises.mkdir(OUTPUT_DIR, { recursive: true });
+    await fsPromises.mkdir(outputDir, { recursive: true });
 
     // 2. Download ZIP
-    logger.info({ url: GPX_ZIP_URL }, 'Downloading GPX archive...');
+    logger.info('Downloading GPX archive...');
     
     const response = await axios({
       method: 'get',
@@ -163,7 +185,7 @@ const fetchAndExtractGpx = async () => {
     logger.info('Download complete. Extracting...');
 
     // 3. Extract ZIP
-    await extractZip(zipPath, OUTPUT_DIR);
+    await extractZip(zipPath, outputDir);
     logger.info('Extraction complete.');
 
     // 4. Cleanup
