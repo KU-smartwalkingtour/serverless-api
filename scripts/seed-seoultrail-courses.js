@@ -46,13 +46,13 @@
 /**
  * 서울 열린데이터 광장 서울둘레길 API Response Item Schema
  * @typedef {Object} SeoulTrailItem
- * @property {string} GIL_NO - 코스 번호 (e.g., "01")
- * @property {string} GIL_NM - 코스 명칭 (e.g., "수락-불암산코스")
- * @property {string} GIL_LEN - 거리 (km)
- * @property {string} REQ_TM - 소요 시간 문자열 (e.g., "약 6시간 30분")
- * @property {string} LV_CD - 난이도 (초급/중급/상급)
- * @property {string} GIL_EXPLN - 코스 설명
- * @property {string} STRT_PSTN - 시작 지점
+ * @property {number} ROAD_NO - 코스 번호 (e.g., 21)
+ * @property {string} ROAD_NM - 코스 명칭 (e.g., "북한산 도봉")
+ * @property {number} ROAD_LEN - 거리 (km) (e.g., 7)
+ * @property {string} REQ_HR - 소요 시간 문자열 (e.g., "약 3시간 25분")
+ * @property {string} LV_KORN - 난이도 (초급/중급/상급)
+ * @property {string} ROAD_EXPLN - 코스 설명
+ * @property {string} BGNG_PSTN - 시작 지점
  */
 
 require('dotenv').config();
@@ -69,7 +69,7 @@ const pino = require('pino');
 // ============================================================================
 
 const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
+  level: process.env.LOG_LEVEL || 'debug',
   timestamp: pino.stdTimeFunctions.isoTime,
   formatters: {
     level: (label) => ({ level: label.toUpperCase() }),
@@ -86,6 +86,7 @@ const logger = pino({
 
 const SERVICE_KEY = process.env.SEOUL_TRAIL_API_KEY;
 // 서울 열린데이터 광장은 path variable로 인증키를 전달 (1부터 22까지 전체 조회)
+// Note: If the API service name has changed from 'viewGil' to something else (e.g. 'seoulGilWalkCourse'), update this URL.
 const API_URL = `http://openapi.seoul.go.kr:8088/${SERVICE_KEY}/json/viewGil/1/22`;
 const GPX_DIR = path.join(__dirname, '..', 'gpx_files', 'seoultrail');
 const TABLE_NAME = process.env.COURSE_TABLE_NAME || 'COURSE_DATA_TEST_TABLE';
@@ -185,31 +186,32 @@ const seedDatabase = async () => {
   try {
     logger.info('Fetching API data...');
     const response = await axios.get(API_URL);
-    logger.info(response);
 
-    const rows = response.data?.viewGil?.row;
+    // Attempt to find rows in potential response locations
+    const rows = response.data?.viewGil?.row || response.data?.seoulGilWalkCourse?.row || response.data?.row;
     if (!rows || rows.length === 0) {
-      logger.warn('No items received from API.');
+      logger.warn({ data: response.data }, 'No items received from API.');
       return;
     }
 
     logger.info({ count: rows.length }, 'Processing items for database insertion');
 
     const upsertPromises = rows.map(async (/** @type {SeoulTrailItem} */ item) => {
-      // 서울둘레길 ID 규칙: seoultrail_{GIL_NO}
-      const courseId = `seoultrail_${item.GIL_NO}`;
-      const gpxFilePath = path.join(GPX_DIR, `${courseId}.gpx`);
+      // 서울둘레길 ID 규칙: seoultrail_{ROAD_NO}
+      const courseId = `seoultrail_${item.ROAD_NO}`;
+      // GPX 파일명 규칙: 서울둘레길2.0_{ROAD_NO}코스.gpx
+      const gpxFilePath = path.join(GPX_DIR, `서울둘레길2.0_${item.ROAD_NO}코스.gpx`);
       const firstPoint = await getFirstPointFromGpx(gpxFilePath);
 
       const courseData = {
         course_id: courseId,
-        course_name: `${item.GIL_NM} 서울둘레길`,
+        course_name: `${item.ROAD_NM} 서울둘레길`,
         course_type: 'seoultrail',
-        course_length: item.GIL_LEN ? parseFloat(item.GIL_LEN) : null,
-        course_duration: parseDuration(item.REQ_TM),
-        course_difficulty: mapDifficulty(item.LV_CD),
-        course_description: item.GIL_EXPLN ? item.GIL_EXPLN.replace(/\r\n/g, ' ') : null,
-        location: item.STRT_PSTN,
+        course_length: item.ROAD_LEN ? Number(item.ROAD_LEN) : null,
+        course_duration: parseDuration(item.REQ_HR),
+        course_difficulty: mapDifficulty(item.LV_KORN),
+        course_description: item.ROAD_EXPLN ? item.ROAD_EXPLN.replace(/\r\n/g, ' ') : null,
+        location: item.BGNG_PSTN,
         start_lat: firstPoint?.lat || null,
         start_lon: firstPoint?.lon || null,
       };
