@@ -13,8 +13,9 @@ src/layers/common/common-layer.zip
 # SST
 .sst/
 
-# gpx file directory
+# hospital information / gpx file directory for local testing
 gpx_files
+data
 
 # Environment variables
 .env
@@ -41,3 +42,4 @@ test.json
 
 # plan markdown file
 plan.md
+
